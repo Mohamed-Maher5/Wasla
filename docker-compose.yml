@@ -1,0 +1,18 @@
+# This file defines the local infrastructure Wasla needs while developing the app.
+# It keeps shared services such as the database consistent across backend runs.
+
+services:
+  db:
+    image: ankane/pgvector:latest
+    container_name: wasla-db
+    environment:
+      POSTGRES_USER: wasla
+      POSTGRES_PASSWORD: wasla
+      POSTGRES_DB: wasla
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

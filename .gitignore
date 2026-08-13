@@ -1,0 +1,8 @@
+# This file keeps local secrets, generated files, and dependency folders out of version control.
+# It protects the repository from committing machine-specific or disposable project artifacts.
+
+.env
+__pycache__/
+*.pyc
+node_modules/
+pgdata/
