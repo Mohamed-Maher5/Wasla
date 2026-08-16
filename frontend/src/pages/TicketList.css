@@ -1,0 +1,16 @@
+.ticket-list-page {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 32px 20px;
+  }
+  
+  .ticket-list-title {
+    margin: 0 0 24px;
+    font-size: 32px;
+    font-weight: 700;
+  }
+  
+  .ticket-list {
+    display: grid;
+    gap: 16px;
+  }
