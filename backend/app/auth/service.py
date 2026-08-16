@@ -3,30 +3,32 @@
 
 from datetime import datetime, timedelta, timezone
 
+import bcrypt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
-from app.config import settings
-from app.database import get_db
+from app.shared.config import settings
+from app.shared.database import get_db
 
 
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = 24
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    return bcrypt.checkpw(
+        plain_password.encode("utf-8"),
+        hashed_password.encode("utf-8"),
+    )
 
 
 def create_access_token(user_id: int | str) -> str:
@@ -61,3 +63,33 @@ def get_current_user(
         raise credentials_exception
 
     return user
+
+
+def require_role(*allowed_roles: str):
+    """
+    Dependency factory for role-gated routes. Usage in another router:
+
+        from app.auth.service import require_role
+
+        @router.post("/departments")
+        def create_department(
+            data: DepartmentCreate,
+            current_user: User = Depends(require_role("superadmin")),
+        ):
+            ...
+
+    Raises 403 if the caller's role isn't in allowed_roles. Department-level
+    scoping (e.g. "admin can only see their own department") still needs to
+    be checked separately inside the route/service using current_user.department_id
+    -- this only checks role, not department.
+    """
+
+    def _check(current_user: User = Depends(get_current_user)) -> User:
+        if current_user.role not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have permission to perform this action",
+            )
+        return current_user
+
+    return _check

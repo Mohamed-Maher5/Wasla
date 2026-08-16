@@ -6,7 +6,7 @@ from collections.abc import Generator
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
-from app.config import settings
+from app.shared.config import settings
 
 
 engine = create_engine(settings.DATABASE_URL)
