@@ -17,7 +17,7 @@ off_topic, unclear, or not_resolved.
 - unclear: speech was too garbled/short/ambiguous to tell any of the above"""
 
 EXPECTED_OUTCOMES = {"resolved", "off_topic", "unclear", "not_resolved"}
-GROQ_MODEL = "llama-3.1-8b-instant"
+GROQ_MODEL = "openai/gpt-oss-20b"
 GROQ_CHAT_COMPLETIONS_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 
@@ -43,14 +43,21 @@ def classify_response(transcript: str) -> str:
                     {"role": "user", "content": transcript},
                 ],
                 "temperature": 0,
-                "max_tokens": 4,
+                "max_completion_tokens": 128,
+                "reasoning_effort": "low",
+                "include_reasoning": False,
             },
             timeout=6,
         )
         response.raise_for_status()
-        result = response.json()["choices"][0]["message"]["content"].strip().lower()
+        raw_result = response.json()["choices"][0]["message"]["content"]
+        result = raw_result.strip().lower().strip("`'\".،,;:!؟? ")
     except Exception as exc:
-        print(f"classify_response ERROR: {exc}")
+        response_body = getattr(getattr(exc, "response", None), "text", "")
+        if response_body:
+            print(f"classify_response ERROR: {exc} response_body={response_body}")
+        else:
+            print(f"classify_response ERROR: {exc}")
         return "unclear"
 
     if result not in EXPECTED_OUTCOMES:
