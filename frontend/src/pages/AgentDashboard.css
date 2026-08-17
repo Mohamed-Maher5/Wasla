@@ -1,0 +1,81 @@
+.agent-dashboard {
+  min-height: 100vh;
+  padding: 32px;
+  background: #f5f7fb;
+  direction: rtl;
+}
+
+.dashboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 32px;
+}
+
+.dashboard-eyebrow {
+  margin: 0 0 6px;
+  color: #2563eb;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.dashboard-header h1 {
+  margin: 0;
+  color: #111827;
+  font-size: 30px;
+}
+
+.dashboard-subtitle {
+  margin: 8px 0 0;
+  color: #6b7280;
+}
+
+.dashboard-role {
+  padding: 8px 16px;
+  border-radius: 20px;
+  background: #dcfce7;
+  color: #166534;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.agent-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 24px;
+  align-items: start;
+}
+
+.ticket-list-main {
+  min-width: 0;
+}
+
+.ticket-list-title {
+  margin: 0 0 24px;
+  font-size: 24px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.ticket-list {
+  display: grid;
+  gap: 16px;
+}
+
+@media (max-width: 900px) {
+  .agent-workspace {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .agent-dashboard {
+    padding: 20px;
+  }
+
+  .dashboard-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 16px;
+  }
+}

@@ -57,6 +57,17 @@ def _extract_conversation_uuid(response: object) -> str | None:
     return str(value) if value else None
 
 
+def _normalize_phone(number: str) -> str:
+    number = number.strip().replace(" ", "").replace("-", "")
+    if number.startswith("+"):
+        return number
+    if number.startswith("00"):
+        return "+" + number[2:]
+    if number.startswith("0"):
+        return "+20" + number[1:]
+    return "+" + number
+
+
 def start_call(phone_number: str, db: Session) -> CallAttempt:
     call_attempt = CallAttempt(
         phone_number=phone_number,
@@ -94,9 +105,11 @@ def start_call(phone_number: str, db: Session) -> CallAttempt:
         private_key=private_key,
     )
     client = vonage.Vonage(auth)
+    to_number = _normalize_phone(phone_number)
+    print(f"Vonage call: to={to_number} from={settings.vonage_from_number}")
     response = client.voice.create_call(
         {
-            "to": [{"type": "phone", "number": phone_number}],
+            "to": [{"type": "phone", "number": to_number}],
             "from_": {"type": "phone", "number": settings.vonage_from_number},
             "ncco": [
                 {
@@ -107,6 +120,14 @@ def start_call(phone_number: str, db: Session) -> CallAttempt:
             ],
         }
     )
+    print(f"Vonage response: {response}")
+
+    if isinstance(response, dict) and response.get("status") == "failed":
+        error_text = response.get("error-text", "unknown error")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Vonage call failed: {error_text}",
+        )
 
     call_attempt.conversation_uuid = _extract_conversation_uuid(response)
     db.commit()

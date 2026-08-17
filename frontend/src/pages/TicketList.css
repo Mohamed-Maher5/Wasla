@@ -1,0 +1,34 @@
+.ticket-list-page {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 32px 20px;
+  }
+
+  .ticket-list-page.agent-workspace {
+    display: grid;
+    max-width: 1280px;
+    grid-template-columns: minmax(0, 1fr) 360px;
+    gap: 24px;
+    align-items: start;
+  }
+
+  .ticket-list-main {
+    min-width: 0;
+  }
+  
+  .ticket-list-title {
+    margin: 0 0 24px;
+    font-size: 32px;
+    font-weight: 700;
+  }
+  
+  .ticket-list {
+    display: grid;
+    gap: 16px;
+  }
+
+  @media (max-width: 900px) {
+    .ticket-list-page.agent-workspace {
+      grid-template-columns: 1fr;
+    }
+  }

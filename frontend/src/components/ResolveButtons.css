@@ -1,0 +1,46 @@
+
+.resolve-section {
+    margin-top: 24px;
+  }
+  
+  .resolve-buttons {
+    display: flex;
+    gap: 12px;
+  }
+  
+  .resolve-button {
+    flex: 1;
+    padding: 12px 16px;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  
+  .resolve-button.resolve {
+    background: #16a34a;
+    color: white;
+  }
+  
+  .resolve-button.unresolve {
+    background: #dc2626;
+    color: white;
+  }
+  
+  .resolve-button:hover {
+    opacity: 0.9;
+  }
+  
+  .resolve-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  
+  .resolve-message {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: #f3f4f6;
+    line-height: 1.6;
+  }

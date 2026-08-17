@@ -7,3 +7,5 @@ __pycache__/
 node_modules/
 pgdata/
 backend/secrets/
+backend/app/documents/uploads/
+frontend/dist/

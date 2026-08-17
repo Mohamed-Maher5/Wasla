@@ -2,7 +2,9 @@
 # It loads environment-based settings so the rest of the app can depend on one source of truth.
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pathlib import Path
 
+BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent  
 
 class Settings(BaseSettings):
     DATABASE_URL: str
@@ -18,7 +20,6 @@ class Settings(BaseSettings):
     elevenlabs_api_key: str = ""
     elevenlabs_voice_id: str = ""
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
-
+    model_config = SettingsConfigDict(env_file=BASE_DIR / ".env")
 
 settings = Settings()

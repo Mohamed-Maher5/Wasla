@@ -1,19 +1,12 @@
-from sqlalchemy import Column, Integer, Table
-
 from app.auth.models import User
 from app.auth.service import hash_password
+from app.departments.models import Department  # noqa: F401
 from app.shared.database import Base, SessionLocal, engine
+from app.telephony.models import CallAttempt  # noqa: F401
+from app.tickets.models import Ticket  # noqa: F401
 
 
-TEST_USER_EMAIL = "test@wasla.com"
-
-
-Table(
-    "departments",
-    Base.metadata,
-    Column("id", Integer, primary_key=True),
-    extend_existing=True,
-)
+SUPERADMIN_EMAIL = "super-admin@gmail.com"
 
 
 def main() -> None:
@@ -21,21 +14,21 @@ def main() -> None:
 
     db = SessionLocal()
     try:
-        existing_user = db.query(User).filter(User.email == TEST_USER_EMAIL).first()
+        existing_user = db.query(User).filter(User.email == SUPERADMIN_EMAIL).first()
         if existing_user is not None:
-            print(f"Test user {TEST_USER_EMAIL} already exists; skipping insert.")
+            print(f"Superadmin {SUPERADMIN_EMAIL} already exists; skipping insert.")
             return
 
         user = User(
-            name="Test User",
-            email=TEST_USER_EMAIL,
-            password_hash=hash_password("test123"),
+            name="superadmin",
+            email=SUPERADMIN_EMAIL,
+            password_hash=hash_password("1234"),
             role="superadmin",
             department_id=None,
         )
         db.add(user)
         db.commit()
-        print(f"Created test user {TEST_USER_EMAIL}.")
+        print(f"Created superadmin {SUPERADMIN_EMAIL}.")
     finally:
         db.close()
 

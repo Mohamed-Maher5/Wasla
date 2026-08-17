@@ -1,163 +1,129 @@
 // This file is the single bridge between the Wasla frontend and backend data layer.
 // Every screen uses it to request platform data instead of reaching into transport details.
 
-const MIN_DELAY_MS = 200;
-const MAX_DELAY_MS = 1000;
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8001";
 
-const departments = [
-  { id: 1, name: "خدمة العملاء", description: "متابعة الشكاوى العامة وتجربة العملاء" },
-  { id: 2, name: "الموارد البشرية", description: "طلبات الموظفين والاستفسارات الداخلية" },
-  { id: 3, name: "المالية", description: "الفواتير والمدفوعات والمراجعات المالية" },
-];
-
-let tickets = [
-  {
-    id: 1,
-    customer_name: "أحمد محمود",
-    status: "unresolved",
-    department_id: 1,
-    assigned_agent_id: 101,
-    customer_phone: "+201001112233",
-    problem_description: "العميل بيقول إن الطلب اتأخر ومحتاج يعرف ميعاد التسليم النهائي.",
-    created_at: "2026-08-12T10:15:00.000Z",
-  },
-  {
-    id: 2,
-    customer_name: "منى حسن",
-    status: "resolved",
-    department_id: 3,
-    assigned_agent_id: 102,
-    customer_phone: "+201221234567",
-    problem_description: "تم خصم مبلغ مرتين من البطاقة والعميلة محتاجة تأكيد رد المبلغ.",
-    created_at: "2026-08-11T14:30:00.000Z",
-  },
-  {
-    id: 3,
-    customer_name: "كريم سمير",
-    status: "unresolved",
-    department_id: 2,
-    assigned_agent_id: 103,
-    customer_phone: "+201155667788",
-    problem_description: "استفسار عن حالة طلب إجازة لم يظهر في النظام.",
-    created_at: "2026-08-13T08:45:00.000Z",
-  },
-];
-
-function delay() {
-  const duration =
-    Math.floor(Math.random() * (MAX_DELAY_MS - MIN_DELAY_MS + 1)) + MIN_DELAY_MS;
-
-  return new Promise((resolve) => {
-    setTimeout(resolve, duration);
+async function request(path, options = {}) {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
+      ...options.headers,
+    },
   });
-}
 
-async function respond(value) {
-  await delay();
-  return typeof value === "function" ? value() : value;
-}
+  const text = await response.text();
+  const data = text ? JSON.parse(text) : null;
 
-function clone(value) {
-  return JSON.parse(JSON.stringify(value));
-}
+  if (!response.ok) {
+    throw new Error(data?.detail || "Request failed");
+  }
 
-function nextTicketId() {
-  return tickets.reduce((maxId, ticket) => Math.max(maxId, ticket.id), 0) + 1;
+  return data;
 }
 
 export async function login(credentials) {
-  return respond(() => ({
-    access_token: `mock-token-${credentials?.email || credentials?.username || "user"}`,
-    token_type: "bearer",
-  }));
+  const token = await request("/auth/login", {
+    method: "POST",
+    body: JSON.stringify(credentials),
+  });
+  const user = await request("/auth/me", { token: token.access_token });
+
+  return {
+    ...token,
+    user,
+  };
 }
 
-export async function getTickets() {
-  return respond(() => clone(tickets));
+export async function getTickets(token) {
+  return request("/tickets", { token });
 }
 
-export async function getTicket(id) {
-  return respond(() => {
-    const ticket = tickets.find((item) => item.id === Number(id));
-    if (!ticket) {
-      throw new Error("Ticket not found");
-    }
-    return clone(ticket);
+export async function getTicket(id, token) {
+  return request(`/tickets/${id}`, { token });
+}
+
+export async function createTicket(data, token) {
+  return request("/tickets", {
+    method: "POST",
+    token,
+    body: JSON.stringify(data),
   });
 }
 
-export async function createTicket(data) {
-  return respond(() => {
-    const ticket = {
-      id: nextTicketId(),
-      customer_name: data.customer_name,
-      status: "unresolved",
-      department_id: data.department_id,
-      assigned_agent_id: data.assigned_agent_id ?? null,
-      customer_phone: data.customer_phone,
-      problem_description: data.problem_description,
-      created_at: new Date().toISOString(),
-    };
-
-    tickets = [ticket, ...tickets];
-    return clone(ticket);
+export async function callCustomer(ticketId, token) {
+  const ticket = await getTicket(ticketId, token);
+  return request("/telephony/trigger", {
+    method: "POST",
+    token,
+    body: JSON.stringify({ phone_number: ticket.client_phone_number }),
   });
 }
 
-export async function callCustomer(ticketId) {
-  return respond(() => {
-    const ticket = tickets.find((item) => item.id === Number(ticketId));
-    if (!ticket) {
-      throw new Error("Ticket not found");
-    }
+export async function resolveTicket(ticketId, token) {
+  return updateTicketStatus(ticketId, "resolved", token);
+}
 
-    return {
-      success: true,
-      outcome:
-        ticket.status === "resolved"
-          ? "العميل أكد إن المشكلة اتحلت وشكر فريق الدعم."
-          : "العميل قال إن المشكلة لسه موجودة ومحتاج متابعة من الموظف.",
-    };
+export async function unresolveTicket(ticketId, token) {
+  return updateTicketStatus(ticketId, "unresolved", token);
+}
+
+export async function getDepartments(token) {
+  return request("/departments", { token });
+}
+
+export async function createDepartment(data, token) {
+  return request("/departments", {
+    method: "POST",
+    token,
+    body: JSON.stringify(data),
   });
 }
 
-export async function resolveTicket(ticketId) {
-  return respond(() => {
-    const ticket = tickets.find((item) => item.id === Number(ticketId));
-    if (!ticket) {
-      throw new Error("Ticket not found");
-    }
+export async function getUsers(token) {
+  return request("/users", { token });
+}
 
-    ticket.status = "resolved";
-    return { id: ticket.id, status: "resolved" };
+export async function createUser(data, token) {
+  return request("/users", {
+    method: "POST",
+    token,
+    body: JSON.stringify(data),
   });
 }
 
-export async function unresolveTicket(ticketId) {
-  return respond(() => {
-    const ticket = tickets.find((item) => item.id === Number(ticketId));
-    if (!ticket) {
-      throw new Error("Ticket not found");
-    }
+export async function uploadDocument(file, token, departmentId) {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("department_id", departmentId);
 
-    ticket.status = "unresolved";
-    return { id: ticket.id, status: "unresolved" };
+  const response = await fetch(`${API_BASE_URL}/documents`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
   });
+
+  const text = await response.text();
+  const data = text ? JSON.parse(text) : null;
+
+  if (!response.ok) {
+    throw new Error(data?.detail || "Upload failed");
+  }
+
+  return data;
 }
 
-export async function askChatbot(question) {
-  return respond(() => ({
-    answer: `حسب مستندات القسم، نقدر نبدأ بمتابعة السؤال ده: "${question}". لو محتاج تفاصيل أكتر، ابعت رقم التذكرة أو اسم العميل.`,
-  }));
+export async function getDocuments(token) {
+  return request("/documents", { token });
 }
 
-export async function getDepartments() {
-  return respond(() => clone(departments));
-}
-
-export async function uploadDocument(file) {
-  return respond(() => ({
-    success: true,
-    filename: file?.name || "document.pdf",
-  }));
+function updateTicketStatus(ticketId, status, token) {
+  return request(`/tickets/${ticketId}/status`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify({ status }),
+  });
 }

@@ -1,0 +1,44 @@
+
+
+
+.detail-card {
+    background: white;
+    padding: 28px;
+    border-radius: 12px;
+    box-shadow: 0 3px 15px rgba(0, 0, 0, 0.07);
+  }
+
+  .ticket-list-page.agent-detail-workspace {
+    display: grid;
+    max-width: 1280px;
+    grid-template-columns: minmax(0, 1fr) 360px;
+    gap: 24px;
+    align-items: start;
+  }
+
+  .ticket-detail-main {
+    min-width: 0;
+  }
+  
+  .back-button {
+    margin-bottom: 20px;
+    padding: 9px 14px;
+    border: 1px solid #d1d5db;
+    background: white;
+    border-radius: 8px;
+  }
+  
+  .detail-row {
+    padding: 12px 0;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  
+  .detail-row:last-child {
+    border-bottom: none;
+  }
+
+  @media (max-width: 900px) {
+    .ticket-list-page.agent-detail-workspace {
+      grid-template-columns: 1fr;
+    }
+  }
