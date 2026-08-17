@@ -10,8 +10,8 @@ from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
-from app.config import settings
-from app.database import get_db
+from app.shared.config import settings
+from app.shared.database import get_db
 
 
 ALGORITHM = "HS256"
