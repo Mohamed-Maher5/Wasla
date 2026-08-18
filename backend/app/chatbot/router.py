@@ -21,8 +21,8 @@ async def upload_document(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if not file.filename.lower().endswith((".pdf", ".docx")):
-        raise HTTPException(status_code=400, detail="Only PDF or DOCX allowed")
+    if not file.filename.lower().endswith((".pdf", ".docx", ".jpg", ".jpeg", ".png")):
+        raise HTTPException(status_code=400, detail="Only PDF, DOCX, JPG or PNG allowed")
  
     file_bytes = await file.read()
  
@@ -68,4 +68,3 @@ def submit_feedback(
         raise HTTPException(status_code=400, detail=str(e))
  
     return {"ok": True}
- 
