@@ -6,6 +6,11 @@ __pycache__/
 *.pyc
 node_modules/
 pgdata/
+<<<<<<< HEAD
 backend/secrets/
 backend/app/documents/uploads/
 frontend/dist/
+=======
+.env.groq
+>>>>>>> origin/02-chatbot
+.venv/

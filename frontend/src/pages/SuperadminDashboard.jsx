@@ -1,7 +1,7 @@
 // This file renders the Superadmin dashboard for the Wasla frontend.
 // The Superadmin has platform-wide access.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   createDepartment,
   createTicket,
@@ -9,7 +9,9 @@ import {
   getDepartments,
   getTickets,
   getUsers,
+  uploadDocument,
 } from "../api";
+import ChatPanel from "../components/ChatPanel";
 import "./SuperadminDashboard.css";
 
 const initialDepartmentForm = {
@@ -34,6 +36,7 @@ const initialTicketForm = {
 };
 
 function SuperadminDashboard({ token, user, onNavigate, onTicketClick }) {
+  const fileInputRef = useRef(null);
   const [departments, setDepartments] = useState([]);
   const [users, setUsers] = useState([]);
   const [tickets, setTickets] = useState([]);
@@ -44,6 +47,8 @@ function SuperadminDashboard({ token, user, onNavigate, onTicketClick }) {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [ticketDeptFilter, setTicketDeptFilter] = useState("all");
+  const [selectedDepartment, setSelectedDepartment] = useState(null);
+  const [uploading, setUploading] = useState(false);
 
   const departmentById = useMemo(() => {
     return departments.reduce((currentMap, department) => {
@@ -179,6 +184,23 @@ function SuperadminDashboard({ token, user, onNavigate, onTicketClick }) {
     }));
   }
 
+  async function handleDeptFileChange(event) {
+    const file = event.target.files?.[0];
+    if (!file || !selectedDepartment) return;
+
+    setUploading(true);
+    setError("");
+    try {
+      await uploadDocument(file, token, selectedDepartment.id);
+      setMessage(`تم رفع "${file.name}" إلى قسم ${selectedDepartment.name}`);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
   useEffect(() => {
     if (!userForm.department_id && departments.length > 0) {
       setUserForm((currentForm) => ({
@@ -208,21 +230,76 @@ function SuperadminDashboard({ token, user, onNavigate, onTicketClick }) {
 
   return (
     <div className="superadmin-dashboard">
-      <header className="dashboard-header">
-        <div>
-          <p className="dashboard-eyebrow">Wasla</p>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf,.docx"
+        style={{ display: "none" }}
+        onChange={handleDeptFileChange}
+      />
 
-          <h1>لوحة تحكم Superadmin</h1>
+      {selectedDepartment ? (
+        <>
+          <header className="dashboard-header">
+            <div>
+              <p className="dashboard-eyebrow">Wasla</p>
+              <h1>{selectedDepartment.name}</h1>
+              <p className="dashboard-subtitle">
+                محادثة ورفع مستندات هذا القسم
+              </p>
+            </div>
+            <button
+              className="back-button"
+              onClick={() => setSelectedDepartment(null)}
+            >
+              ← العودة
+            </button>
+          </header>
 
-          <p className="dashboard-subtitle">
-            إدارة ومتابعة المنصة بالكامل
-          </p>
-        </div>
+          {error && <p className="dashboard-alert error">{error}</p>}
+          {message && <p className="dashboard-alert success">{message}</p>}
 
-        <div className="dashboard-role">
-          Superadmin
-        </div>
-      </header>
+          <div className="dept-scoped-layout">
+            <div className="dept-chat-col">
+              <ChatPanel
+                token={token}
+                user={user}
+                fullWidth
+                departmentId={selectedDepartment.id}
+              />
+            </div>
+            <div className="dept-upload-col">
+              <div className="dashboard-section">
+                <div className="section-heading">
+                  <h2>رفع مستند</h2>
+                  <p>رفع ملف إلى قسم {selectedDepartment.name}</p>
+                </div>
+                <button
+                  className="upload-button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                >
+                  {uploading ? "جاري الرفع..." : "+ اختر ملف"}
+                </button>
+                <p className="dept-upload-hint">
+                  PDF أو DOCX فقط — سيتم المعالجة تلقائياً
+                </p>
+              </div>
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          <header className="dashboard-header">
+            <div>
+              <p className="dashboard-eyebrow">Wasla</p>
+              <h1>لوحة تحكم Superadmin</h1>
+              <p className="dashboard-subtitle">
+                إدارة ومتابعة المنصة بالكامل
+              </p>
+            </div>
+            <div className="dashboard-role">Superadmin</div>
+          </header>
 
       <section className="dashboard-stats">
         <div className="stat-card">
@@ -287,7 +364,11 @@ function SuperadminDashboard({ token, user, onNavigate, onTicketClick }) {
             {!loading && departments.length === 0 && <p>No departments yet.</p>}
 
             {departments.map((department) => (
-              <div className="management-row" key={department.id}>
+              <div
+                className="management-row dept-clickable"
+                key={department.id}
+                onClick={() => setSelectedDepartment(department)}
+              >
                 <strong>{department.name}</strong>
                 <span>{department.description || "No description"}</span>
               </div>
@@ -514,6 +595,17 @@ function SuperadminDashboard({ token, user, onNavigate, onTicketClick }) {
       <section className="dashboard-bottom-actions">
         <button
           className="action-card"
+          onClick={() => onNavigate?.("chat")}
+        >
+          <span className="action-icon">💬</span>
+          <span className="action-title">اسأل المساعد</span>
+          <span className="action-description">
+            سؤال المساعد الذكي عن أي موضوع
+          </span>
+        </button>
+
+        <button
+          className="action-card"
           onClick={() => onNavigate?.("documents")}
         >
           <span className="action-icon">📄</span>
@@ -523,6 +615,8 @@ function SuperadminDashboard({ token, user, onNavigate, onTicketClick }) {
           </span>
         </button>
       </section>
+        </>
+      )}
     </div>
   );
 }

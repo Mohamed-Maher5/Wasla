@@ -41,30 +41,73 @@
 
 .agent-workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
+  grid-template-columns: 1fr 0.6fr;
   gap: 24px;
   align-items: start;
 }
 
-.ticket-list-main {
+.agent-chat-column {
   min-width: 0;
+  height: calc(100vh - 160px);
+}
+
+.agent-chat-column .chat-panel {
+  height: 100%;
+  max-height: none;
+  position: static;
+}
+
+.agent-tickets-column {
+  min-width: 0;
+  max-height: calc(100vh - 160px);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.agent-tickets-column::-webkit-scrollbar {
+  width: 6px;
+}
+
+.agent-tickets-column::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
 }
 
 .ticket-list-title {
-  margin: 0 0 24px;
-  font-size: 24px;
+  margin: 0 0 20px;
+  font-size: 20px;
   font-weight: 700;
   color: #111827;
 }
 
 .ticket-list {
   display: grid;
-  gap: 16px;
+  gap: 12px;
+}
+
+.agent-loading-text,
+.agent-error-text,
+.agent-empty-text {
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.agent-error-text {
+  color: #991b1b;
 }
 
 @media (max-width: 900px) {
   .agent-workspace {
     grid-template-columns: 1fr;
+  }
+
+  .agent-chat-column {
+    height: 50vh;
+  }
+
+  .agent-tickets-column {
+    max-height: none;
+    overflow-y: visible;
   }
 }
 

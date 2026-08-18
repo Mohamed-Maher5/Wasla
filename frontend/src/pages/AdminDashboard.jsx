@@ -317,6 +317,17 @@ function AdminDashboard({ token, user, onNavigate, onTicketClick }) {
       <section className="dashboard-bottom-actions">
         <button
           className="action-card"
+          onClick={() => onNavigate?.("chat")}
+        >
+          <span className="action-icon">💬</span>
+          <span className="action-title">اسأل المساعد</span>
+          <span className="action-description">
+            سؤال المساعد الذكي عن معرفة القسم
+          </span>
+        </button>
+
+        <button
+          className="action-card"
           onClick={() => onNavigate?.("documents")}
         >
           <span className="action-icon">📄</span>

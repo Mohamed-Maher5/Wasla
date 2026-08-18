@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { getDepartments, getDocuments, uploadDocument } from "../api";
 import "./Documents.css";
 
-function Documents({ token, user, onBack }) {
+function Documents({ token, user, onBack, initialDeptId }) {
   const fileInputRef = useRef(null);
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -13,9 +13,10 @@ function Documents({ token, user, onBack }) {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [departments, setDepartments] = useState([]);
-  const [selectedDeptId, setSelectedDeptId] = useState(null);
+  const [selectedDeptId, setSelectedDeptId] = useState(initialDeptId ?? null);
 
   const isSuperadmin = user?.role === "superadmin";
+  const isLockedDept = initialDeptId != null;
 
   useEffect(() => {
     async function loadDocuments() {
@@ -38,7 +39,9 @@ function Documents({ token, user, onBack }) {
       try {
         const data = await getDepartments(token);
         setDepartments(data);
-        if (data.length > 0) {
+        if (initialDeptId != null) {
+          setSelectedDeptId(initialDeptId);
+        } else if (!selectedDeptId && data.length > 0) {
           setSelectedDeptId(data[0].id);
         }
       } catch (err) {
@@ -82,9 +85,11 @@ function Documents({ token, user, onBack }) {
     }
   }
 
-  const filtered = documents.filter((doc) =>
-    doc.filename.toLowerCase().includes(search.toLowerCase()),
-  );
+  const filtered = documents.filter((doc) => {
+    const matchesSearch = doc.filename.toLowerCase().includes(search.toLowerCase());
+    const matchesDept = !isSuperadmin || !selectedDeptId || doc.department_id === selectedDeptId;
+    return matchesSearch && matchesDept;
+  });
 
   const lastUpload = documents.length > 0 ? documents[0].uploaded_at : null;
 
@@ -105,9 +110,11 @@ function Documents({ token, user, onBack }) {
           <h1>Documents</h1>
 
           <p className="documents-subtitle">
-            {user?.role === "superadmin"
-              ? "إدارة مستندات المعرفة لجميع الأقسام"
-              : "إدارة المستندات الخاصة بقسمك"}
+            {isLockedDept
+              ? `مستندات قسم: ${departments.find((d) => d.id === initialDeptId)?.name || ""}`
+              : isSuperadmin
+                ? "إدارة مستندات المعرفة لجميع الأقسام"
+                : "إدارة المستندات الخاصة بقسمك"}
           </p>
         </div>
 
@@ -117,6 +124,7 @@ function Documents({ token, user, onBack }) {
               className="documents-dept-select"
               value={selectedDeptId ?? ""}
               onChange={(e) => setSelectedDeptId(Number(e.target.value))}
+              disabled={isLockedDept}
             >
               {departments.map((dept) => (
                 <option key={dept.id} value={dept.id}>

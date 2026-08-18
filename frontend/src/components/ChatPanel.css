@@ -1,6 +1,3 @@
-
-
-
 .chat-panel {
   position: sticky;
   top: 24px;
@@ -13,6 +10,14 @@
   border-radius: 8px;
   box-shadow: 0 3px 15px rgba(0, 0, 0, 0.07);
   overflow: hidden;
+}
+
+.chat-panel--full {
+  position: static;
+  min-height: 0;
+  height: 100%;
+  max-height: none;
+  border-radius: 14px;
 }
 
 .chat-panel-header {
@@ -48,6 +53,99 @@
 .chat-message.assistant {
   margin-left: auto;
   background: #e5e7eb;
+}
+
+.chat-message-text {
+  white-space: pre-wrap;
+}
+
+.chat-sources {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.chat-sources-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #6b7280;
+}
+
+.chat-source-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.chat-feedback {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.chat-feedback-btn {
+  padding: 2px 6px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: white;
+  font-size: 14px;
+  cursor: pointer;
+  transition: 0.15s;
+}
+
+.chat-feedback-btn:hover {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+.chat-feedback-sent {
+  font-size: 12px;
+  color: #6b7280;
+  font-style: italic;
+}
+
+.chat-loading {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+}
+
+.chat-loading-dots span {
+  display: inline-block;
+  animation: dotPulse 1.2s infinite;
+  font-size: 22px;
+  line-height: 1;
+  color: #6b7280;
+}
+
+.chat-loading-dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.chat-loading-dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes dotPulse {
+  0%, 60%, 100% { opacity: 0.3; }
+  30% { opacity: 1; }
+}
+
+.chat-error {
+  padding: 8px 14px;
+  background: #fee2e2;
+  color: #991b1b;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .chat-form {
@@ -90,5 +188,10 @@
     position: static;
     min-height: 360px;
     max-height: none;
+  }
+
+  .chat-panel--full {
+    min-height: 400px;
+    height: auto;
   }
 }

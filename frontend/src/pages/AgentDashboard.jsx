@@ -41,14 +41,18 @@ function AgentDashboard({ token, user, onTicketClick }) {
       </header>
 
       <div className="agent-workspace">
-        <div className="ticket-list-main">
+        <div className="agent-chat-column">
+          <ChatPanel token={token} user={user} />
+        </div>
+
+        <div className="agent-tickets-column">
           <h2 className="ticket-list-title">التذاكر المسندة إليّ</h2>
 
-          {loading && <p>Loading tickets...</p>}
-          {error && <p>Error: {error}</p>}
+          {loading && <p className="agent-loading-text">جاري تحميل التذاكر...</p>}
+          {error && <p className="agent-error-text">خطأ: {error}</p>}
 
           {!loading && !error && tickets.length === 0 && (
-            <p>No tickets assigned to you.</p>
+            <p className="agent-empty-text">لا توجد تذاكر مسندة إليك.</p>
           )}
 
           <div className="ticket-list">
@@ -61,8 +65,6 @@ function AgentDashboard({ token, user, onTicketClick }) {
             ))}
           </div>
         </div>
-
-        <ChatPanel />
       </div>
     </div>
   );

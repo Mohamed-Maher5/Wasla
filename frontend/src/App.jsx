@@ -1,11 +1,9 @@
-// This file is the root of the Wasla frontend application.
-// It controls the logged-in / logged-out flow and ticket navigation.
-
 import { useState } from "react";
 
 import Login from "./pages/Login";
 import AdminDashboard from "./pages/AdminDashboard";
 import AgentDashboard from "./pages/AgentDashboard";
+import ChatPage from "./pages/ChatPage";
 import Documents from "./pages/Documents";
 import SuperadminDashboard from "./pages/SuperadminDashboard";
 import TicketDetail from "./pages/TicketDetail";
@@ -57,6 +55,16 @@ function App() {
   if (view === "documents") {
     return (
       <Documents
+        token={token}
+        user={user}
+        onBack={() => setView("dashboard")}
+      />
+    );
+  }
+
+  if (view === "chat") {
+    return (
+      <ChatPage
         token={token}
         user={user}
         onBack={() => setView("dashboard")}

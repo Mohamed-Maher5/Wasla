@@ -12,6 +12,8 @@ from app.tickets import models as ticket_models
 from app.tickets.router import router as tickets_router
 from app.shared.database import Base, engine
 from app.users.router import router as users_router
+from app.chatbot import models as chatbot_models
+from app.chatbot.router import router as chatbot_router
 
 
 app = FastAPI(title="Wasla")
@@ -28,7 +30,7 @@ app.add_middleware(
 @app.on_event("startup")
 def create_database_tables() -> None:
     # Keep model imports above this call so SQLAlchemy has all table metadata.
-    _ = (auth_models, department_models, ticket_models, document_models)
+    _ = (auth_models, department_models, ticket_models, document_models, chatbot_models)
     Base.metadata.create_all(bind=engine)
 
 
@@ -38,4 +40,4 @@ app.include_router(departments_router)
 app.include_router(documents_router)
 app.include_router(tickets_router)
 app.include_router(users_router)
-# app.include_router(chatbot_router, prefix="/chatbot", tags=["chatbot"])
+app.include_router(chatbot_router)

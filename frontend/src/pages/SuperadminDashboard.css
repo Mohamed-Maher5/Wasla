@@ -199,6 +199,79 @@
     transform: translateY(-1px);
   }
 
+  .dept-clickable {
+    cursor: pointer;
+    transition: 0.2s;
+  }
+
+  .dept-clickable:hover {
+    border-color: #2563eb;
+    background: #eff6ff;
+    transform: translateY(-1px);
+  }
+
+  .back-button {
+    padding: 10px 20px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: white;
+    color: #374151;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.2s;
+  }
+
+  .back-button:hover {
+    border-color: #2563eb;
+    color: #2563eb;
+  }
+
+  .dept-scoped-layout {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 24px;
+    align-items: start;
+  }
+
+  .dept-chat-col {
+    min-width: 0;
+  }
+
+  .dept-upload-col .dashboard-section {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 24px;
+  }
+
+  .upload-button {
+    display: inline-block;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    background: #2563eb;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.2s;
+    margin-top: 12px;
+  }
+
+  .upload-button:hover {
+    background: #1d4ed8;
+  }
+
+  .upload-button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .dept-upload-hint {
+    margin-top: 10px;
+    color: #9ca3af;
+    font-size: 13px;
+  }
+
   .ticket-list-toolbar {
     display: flex;
     align-items: center;
@@ -345,6 +418,10 @@
     }
   
     .dashboard-overview {
+      grid-template-columns: 1fr;
+    }
+
+    .dept-scoped-layout {
       grid-template-columns: 1fr;
     }
 

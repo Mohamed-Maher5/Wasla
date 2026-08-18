@@ -97,7 +97,7 @@ function TicketDetail({ ticketId, token, user, onBack }) {
         </div>
       </div>
 
-      <ChatPanel />
+      {user?.role !== "superadmin" && <ChatPanel />}
     </div>
   );
 }

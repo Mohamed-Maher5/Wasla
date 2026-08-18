@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     public_base_url: str = ""
     elevenlabs_api_key: str = ""
     elevenlabs_voice_id: str = ""
+    huggingface_api_key: str = ""
 
     model_config = SettingsConfigDict(env_file=BASE_DIR / ".env")
 

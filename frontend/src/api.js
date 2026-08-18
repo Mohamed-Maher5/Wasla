@@ -96,9 +96,12 @@ export async function createUser(data, token) {
 export async function uploadDocument(file, token, departmentId) {
   const formData = new FormData();
   formData.append("file", file);
-  formData.append("department_id", departmentId);
+  // Only send department_id if one is provided (superadmin chooses, admin doesn't).
+  if (departmentId != null) {
+    formData.append("department_id", departmentId);
+  }
 
-  const response = await fetch(`${API_BASE_URL}/documents`, {
+  const response = await fetch(`${API_BASE_URL}/chat/documents`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -118,6 +121,26 @@ export async function uploadDocument(file, token, departmentId) {
 
 export async function getDocuments(token) {
   return request("/documents", { token });
+}
+
+export async function chatQuery(question, token, departmentId) {
+  const body = { question };
+  if (departmentId != null) {
+    body.department_id = departmentId;
+  }
+  return request("/chat/query", {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export async function chatFeedback(data, token) {
+  return request("/chat/feedback", {
+    method: "POST",
+    token,
+    body: JSON.stringify(data),
+  });
 }
 
 function updateTicketStatus(ticketId, status, token) {
