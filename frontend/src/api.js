@@ -61,6 +61,10 @@ export async function callCustomer(ticketId, token) {
   });
 }
 
+export async function getCallStatus(callId, token) {
+  return request(`/telephony/status/${callId}`, { token });
+}
+
 export async function resolveTicket(ticketId, token) {
   return updateTicketStatus(ticketId, "resolved", token);
 }
@@ -102,6 +106,29 @@ export async function uploadDocument(file, token, departmentId) {
   }
 
   const response = await fetch(`${API_BASE_URL}/chat/documents`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  const text = await response.text();
+  const data = text ? JSON.parse(text) : null;
+
+  if (!response.ok) {
+    throw new Error(data?.detail || "Upload failed");
+  }
+
+  return data;
+}
+
+export async function uploadKnowledgeDocument(file, token, departmentId) {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("department_id", departmentId);
+
+  const response = await fetch(`${API_BASE_URL}/documents`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,

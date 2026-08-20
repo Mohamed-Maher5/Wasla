@@ -56,6 +56,13 @@ def post_user(
             detail="email already exists",
         )
 
+    if current_user.role == UserRole.SUPERADMIN.value:
+        if data.role != UserRole.ADMIN.value:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Superadmin can only create admins",
+            )
+
     if current_user.role == UserRole.ADMIN.value:
         if data.department_id != current_user.department_id:
             raise HTTPException(
@@ -74,6 +81,7 @@ def post_user(
         password_hash=hash_password(data.password),
         role=data.role,
         department_id=data.department_id,
+        created_by=current_user.id,
     )
     db.add(user)
     db.commit()

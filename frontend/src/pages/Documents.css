@@ -27,11 +27,11 @@
     font-size: 30px;
   }
   
-  .documents-subtitle {
+.documents-subtitle {
     margin: 8px 0 0;
     color: #6b7280;
   }
-  
+
   .upload-button {
     padding: 11px 18px;
     border: none;
@@ -43,11 +43,16 @@
     cursor: pointer;
     transition: 0.2s;
   }
-  
+
   .upload-button:hover {
     background: #1d4ed8;
   }
-  
+
+  .upload-button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
   .documents-summary {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -135,21 +140,21 @@
     color: #111827;
   }
   
-  .documents-empty p {
+.documents-empty p {
     max-width: 430px;
     margin: 0 0 20px;
     color: #6b7280;
     line-height: 1.6;
   }
-  
+
   .upload-button.secondary {
-    background: #111827;
+    background: #2563eb;
   }
-  
+
   .upload-button.secondary:hover {
-    background: #1f2937;
+    background: #1d4ed8;
   }
-  
+
   .documents-header-actions {
     display: flex;
     gap: 12px;

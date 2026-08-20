@@ -12,3 +12,4 @@ class User(Base):
     password_hash = Column(String, nullable=False)
     role = Column(String, nullable=False)
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)

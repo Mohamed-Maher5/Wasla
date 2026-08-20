@@ -2,7 +2,7 @@
 // It lets admins upload and browse department knowledge files.
 
 import { useEffect, useRef, useState } from "react";
-import { getDepartments, getDocuments, uploadDocument } from "../api";
+import { getDepartments, getDocuments, uploadKnowledgeDocument } from "../api";
 import "./Documents.css";
 
 function Documents({ token, user, onBack, initialDeptId }) {
@@ -73,7 +73,7 @@ function Documents({ token, user, onBack, initialDeptId }) {
     setError("");
 
     try {
-      const doc = await uploadDocument(file, token, deptId);
+      const doc = await uploadKnowledgeDocument(file, token, deptId);
       setDocuments((prev) => [doc, ...prev]);
     } catch (err) {
       setError(err.message);
@@ -137,14 +137,6 @@ function Documents({ token, user, onBack, initialDeptId }) {
           <button className="back-button" onClick={onBack}>
             ← العودة
           </button>
-
-          <button
-            className="upload-button"
-            onClick={handleUploadClick}
-            disabled={uploading}
-          >
-            {uploading ? "جاري الرفع..." : "+ رفع مستند"}
-          </button>
         </div>
       </header>
 
@@ -201,11 +193,15 @@ function Documents({ token, user, onBack, initialDeptId }) {
             <h3>لا توجد مستندات حالياً</h3>
 
             <p>
-              اضغط على "رفع مستند" لإضافة أول ملف.
+              اضغط على "رفع أول مستند" لإضافة ملف.
             </p>
 
-            <button className="upload-button secondary" onClick={handleUploadClick}>
-              رفع أول مستند
+            <button
+              className="upload-button secondary"
+              onClick={handleUploadClick}
+              disabled={uploading}
+            >
+              {uploading ? "جاري الرفع..." : "رفع أول مستند"}
             </button>
           </div>
         )}

@@ -7,12 +7,13 @@ from sqlalchemy.orm import Session
 from app.auth.models import User
 from app.auth.service import get_current_user, require_role
 from app.shared.database import get_db
-from app.tickets.schemas import TicketCreate, TicketOut
+from app.tickets.schemas import TicketCreate, TicketOut, TicketStatusUpdate
 from app.tickets.service import (
     create_ticket,
     get_ticket,
     list_tickets,
     resolve_ticket,
+    set_status,
 )
 
 
@@ -31,7 +32,7 @@ def get_tickets(
 def post_ticket(
     data: TicketCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("superadmin", "admin")),
+    current_user: User = Depends(require_role("admin")),
 ) -> TicketOut:
     return create_ticket(data, db, current_user)
 
@@ -52,3 +53,13 @@ def post_ticket_resolve(
     current_user: User = Depends(get_current_user),
 ) -> TicketOut:
     return resolve_ticket(ticket_id, db, current_user)
+
+
+@router.patch("/{ticket_id}/status", response_model=TicketOut)
+def patch_ticket_status(
+    ticket_id: str,
+    data: TicketStatusUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> TicketOut:
+    return set_status(ticket_id, data.status, db, current_user)

@@ -69,7 +69,7 @@ function ChatPanel({ token, user, fullWidth, departmentId }) {
   return (
     <aside className={panelClass} aria-label="Agent chat panel">
       <div className="chat-panel-header">
-        <h2>مساعد Wasla</h2>
+        <h2>مساعد ( وَصْلَة )</h2>
       </div>
 
       <div className="chat-messages">

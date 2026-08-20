@@ -24,6 +24,6 @@ def post_document(
     file: UploadFile,
     department_id: int = Form(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("superadmin", "admin")),
+    current_user: User = Depends(require_role("admin")),
 ) -> DocumentOut:
     return upload_document(file, db, current_user, department_id)
