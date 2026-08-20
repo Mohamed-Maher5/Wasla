@@ -119,12 +119,29 @@ export async function uploadDocument(file, token, departmentId) {
   return data;
 }
 
-export async function getDocuments(token) {
-  return request("/documents", { token });
+export async function getDocuments(token, departmentId) {
+  const query = departmentId != null ? `?department_id=${departmentId}` : "";
+  return request(`/chat/documents${query}`, { token });
 }
 
-export async function chatQuery(question, token, departmentId) {
-  const body = { question };
+export async function getConversations(token, departmentId) {
+  const query = departmentId != null ? `?department_id=${departmentId}` : "";
+  return request(`/chat/conversations${query}`, { token });
+}
+
+export async function getConversationDetail(conversationId, token) {
+  return request(`/chat/conversations/${conversationId}`, { token });
+}
+
+export async function deleteConversation(conversationId, token) {
+  return request(`/chat/conversations/${conversationId}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
+export async function chatQuery(question, token, departmentId, history = [], conversationId = null) {
+  const body = { question, history, conversation_id: conversationId };
   if (departmentId != null) {
     body.department_id = departmentId;
   }

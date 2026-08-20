@@ -1,17 +1,39 @@
-from typing import List
+from typing import List, Optional, TypedDict
 import io
 
 import requests
 import pypdf
 import docx as docx_lib
+import fitz  # PyMuPDF — renders PDF pages to images for OCR fallback
+import pytesseract
+from PIL import Image
 
 from app.shared.config import settings
 
 CHUNK_SIZE_CHARS = 1500   # roughly 300-400 Arabic tokens
 CHUNK_OVERLAP_CHARS = 200
 
-HF_API_URL = "https://router.huggingface.co/hf-inference/models/sentence-transformers/all-MiniLM-L6-v2/pipeline/feature-extraction"
+HF_API_URL = "https://router.huggingface.co/hf-inference/models/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2/pipeline/feature-extraction"
 EMBEDDING_TIMEOUT = 15  # seconds
+
+# A page is treated as "no real text" (i.e. a scanned image, not real text)
+# when pypdf extracts fewer than this many characters, and gets OCR'd
+# instead. Small headers/footers on an otherwise-blank page can produce a
+# handful of stray characters, so this is intentionally not just "== 0".
+MIN_TEXT_CHARS_BEFORE_OCR = 20
+
+# Tesseract language codes to run — Arabic + English covers Wasla's
+# documents; "+" runs both together in one pass.
+OCR_LANGUAGES = "ara+eng"
+
+# Render resolution for OCR — higher = more accurate but slower. 200 DPI is
+# a reasonable middle ground for scanned office documents.
+OCR_RENDER_DPI = 200
+
+
+class PageChunk(TypedDict):
+    text: str
+    page_number: Optional[int]  # 1-based; None when the source has no page concept (DOCX)
 
 
 # ---------------------------------------------------------------------------
@@ -20,32 +42,87 @@ EMBEDDING_TIMEOUT = 15  # seconds
 
 def extract_text(file_bytes: bytes, filename: str) -> str:
     """
-    Dispatches based on file extension. Raises ValueError for unsupported
-    types so the router can return a 400 instead of crashing.
+    Backward-compatible plain-text extraction (all pages joined).
+    Kept for any caller that just wants the raw text without page info.
+    """
+    return "\n".join(page_text for _, page_text in extract_pages(file_bytes, filename))
+
+
+def extract_pages(file_bytes: bytes, filename: str) -> List[tuple[Optional[int], str]]:
+    """
+    Dispatches based on file extension and returns a list of
+    (page_number, text) tuples so page numbers survive into chunking.
+    Raises ValueError for unsupported types so the router can return a
+    400 instead of crashing.
     """
     lower = filename.lower()
 
     if lower.endswith(".pdf"):
-        return _extract_pdf(file_bytes)
+        return _extract_pdf_pages(file_bytes)
     elif lower.endswith(".docx"):
-        return _extract_docx(file_bytes)
+        return _extract_docx_pages(file_bytes)
+    elif lower.endswith((".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".tif", ".webp")):
+        return _extract_image_pages(file_bytes)
     else:
-        raise ValueError(f"Unsupported file type: {filename} — only PDF or DOCX allowed")
+        raise ValueError(
+            f"Unsupported file type: {filename} — only PDF, DOCX, or image "
+            f"files (PNG/JPG/JPEG/BMP/TIFF/WEBP) are allowed"
+        )
 
 
-def _extract_pdf(file_bytes: bytes) -> str:
+def _ocr_image(image: "Image.Image") -> str:
+    """Runs Tesseract OCR (Arabic + English) on a single PIL image."""
+    return pytesseract.image_to_string(image, lang=OCR_LANGUAGES) or ""
+
+
+def _extract_pdf_pages(file_bytes: bytes) -> List[tuple[Optional[int], str]]:
     reader = pypdf.PdfReader(io.BytesIO(file_bytes))
-    pages_text = []
-    for page in reader.pages:
+    pages = []
+    doc_for_ocr = None  # lazily opened only if a page actually needs OCR
+
+    for i, page in enumerate(reader.pages):
         text = page.extract_text() or ""
-        pages_text.append(text)
-    return "\n".join(pages_text)
+
+        # Scanned pages have no embedded text layer — pypdf returns almost
+        # nothing for them. Fall back to rendering that page as an image
+        # and running OCR on it, so scanned PDFs are readable too.
+        if len(text.strip()) < MIN_TEXT_CHARS_BEFORE_OCR:
+            if doc_for_ocr is None:
+                doc_for_ocr = fitz.open(stream=file_bytes, filetype="pdf")
+            try:
+                pdf_page = doc_for_ocr.load_page(i)
+                zoom = OCR_RENDER_DPI / 72  # PDF base unit is 72 DPI
+                pix = pdf_page.get_pixmap(matrix=fitz.Matrix(zoom, zoom))
+                image = Image.open(io.BytesIO(pix.tobytes("png")))
+                ocr_text = _ocr_image(image)
+                if ocr_text.strip():
+                    print(f"[chatbot] Page {i+1}: no text layer — OCR recovered {len(ocr_text)} chars")
+                    text = ocr_text
+            except Exception as e:
+                print(f"[chatbot] OCR failed for PDF page {i+1}: {e}")
+
+        pages.append((i + 1, text))  # 1-based page numbers
+
+    if doc_for_ocr is not None:
+        doc_for_ocr.close()
+
+    return pages
 
 
-def _extract_docx(file_bytes: bytes) -> str:
+def _extract_docx_pages(file_bytes: bytes) -> List[tuple[Optional[int], str]]:
+    # DOCX has no reliable page concept (pagination depends on the reader),
+    # so the whole document is treated as one page-less block.
     doc = docx_lib.Document(io.BytesIO(file_bytes))
     paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
-    return "\n".join(paragraphs)
+    return [(None, "\n".join(paragraphs))]
+
+
+def _extract_image_pages(file_bytes: bytes) -> List[tuple[Optional[int], str]]:
+    # A standalone image (screenshot, photo of a document, etc.) is
+    # OCR'd directly and treated as one page-less block, same as DOCX.
+    image = Image.open(io.BytesIO(file_bytes))
+    text = _ocr_image(image)
+    return [(None, text)]
 
 
 # ---------------------------------------------------------------------------
@@ -77,6 +154,19 @@ def chunk_text(text: str, chunk_size: int = CHUNK_SIZE_CHARS,
         start = end - overlap  # step back by the overlap amount
 
     return chunks
+
+
+def chunk_pages(pages: List[tuple[Optional[int], str]], chunk_size: int = CHUNK_SIZE_CHARS,
+                 overlap: int = CHUNK_OVERLAP_CHARS) -> List[PageChunk]:
+    """
+    Chunks each page independently so every chunk keeps its correct
+    page_number. A page's text is never merged with another page's text.
+    """
+    result: List[PageChunk] = []
+    for page_number, page_text in pages:
+        for piece in chunk_text(page_text, chunk_size=chunk_size, overlap=overlap):
+            result.append({"text": piece, "page_number": page_number})
+    return result
 
 
 # ---------------------------------------------------------------------------
