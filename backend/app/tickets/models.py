@@ -19,6 +19,7 @@ class Ticket(Base):
     assigned_to = Column(ForeignKey("users.id"), nullable=False)
     department_id = Column(ForeignKey("departments.id"), nullable=False)
     status = Column(String, nullable=False, default=TicketStatus.UNRESOLVED.value)
+    created_by = Column(ForeignKey("users.id"), nullable=True)
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,

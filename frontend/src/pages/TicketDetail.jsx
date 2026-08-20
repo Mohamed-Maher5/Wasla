@@ -1,12 +1,13 @@
 // This file renders the ticket detail page for the Wasla frontend.
-// It gives support users the focused workspace for one customer issue.
+// It gives support users a focused workspace for one customer issue:
+// ticket data on the right, chatbot window on the left (mirrored from
+// the list view).
 
 import { useEffect, useState } from "react";
 import { getTicket } from "../api";
 import "./TicketDetail.css";
 
 import CallButton from "../components/CallButton";
-import ResolveButtons from "../components/ResolveButtons";
 import ChatPanel from "../components/ChatPanel";
 
 function TicketDetail({ ticketId, token, user, onBack }) {
@@ -37,8 +38,14 @@ function TicketDetail({ ticketId, token, user, onBack }) {
     return <p>Error: {error}</p>;
   }
 
+  const showChat = user?.role !== "superadmin";
+
   return (
-    <div className="ticket-list-page agent-detail-workspace">
+    <div
+      className={`ticket-list-page agent-detail-workspace ${
+        showChat ? "with-chat" : ""
+      }`}
+    >
       <div className="ticket-detail-main">
         <button className="back-button" onClick={onBack}>
           Back to Tickets
@@ -67,37 +74,15 @@ function TicketDetail({ ticketId, token, user, onBack }) {
             <div>{ticket.status}</div>
           </div>
 
-          <div className="detail-row">
-            <strong>Department ID:</strong>
-            <div>{ticket.department_id}</div>
-          </div>
-
-          <div className="detail-row">
-            <strong>Assigned To:</strong>
-            <div>{ticket.assigned_to}</div>
-          </div>
-
-          <div className="detail-row">
-            <strong>Created At:</strong>
-            <div>{ticket.created_at}</div>
-          </div>
-
           <CallButton ticketId={ticket.id} token={token} />
-
-          <ResolveButtons
-            ticketId={ticket.id}
-            token={token}
-            onStatusChange={(status) => {
-              setTicket((currentTicket) => ({
-                ...currentTicket,
-                status,
-              }));
-            }}
-          />
         </div>
       </div>
 
-      {user?.role !== "superadmin" && <ChatPanel />}
+      {showChat && (
+        <div className="ticket-detail-chat-column">
+          <ChatPanel token={token} user={user} />
+        </div>
+      )}
     </div>
   );
 }

@@ -21,7 +21,7 @@ async def upload_document(
     file: UploadFile = File(...),
     department_id: int | None = Form(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("superadmin", "admin")),
+    current_user: User = Depends(require_role("admin")),
 ):
     ALLOWED_EXTENSIONS = (
         ".pdf", ".docx",
@@ -200,7 +200,7 @@ def delete_conversation_endpoint(
 def ask_chatbot(
     payload: ChatQueryIn,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("superadmin", "admin", "agent")),
+    current_user: User = Depends(require_role("agent")),
 ):
     if not payload.question.strip():
         raise HTTPException(status_code=400, detail="Question is empty")
@@ -244,7 +244,7 @@ def ask_chatbot(
 def submit_feedback(
     payload: ChatFeedbackIn,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("admin", "agent")),
+    current_user: User = Depends(require_role("agent")),
 ):
     try:
         service.submit_feedback(db=db, log_id=payload.log_id, feedback=payload.feedback)

@@ -20,7 +20,12 @@ app = FastAPI(title="Wasla")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3002"],
+    allow_origins=[
+        "http://localhost:3002",
+        "http://127.0.0.1:3002",
+        "http://localhost:3003",
+        "http://127.0.0.1:3003",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

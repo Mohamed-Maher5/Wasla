@@ -47,6 +47,12 @@ def list_tickets(db: Session, current_user: User) -> list[Ticket]:
 
 
 def get_ticket(ticket_id: str, db: Session, current_user: User) -> Ticket:
+    if current_user.role == UserRole.SUPERADMIN.value:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to view tickets",
+        )
+
     ticket = db.get(Ticket, ticket_id)
     if ticket is None or not _can_access_ticket(ticket, current_user):
         raise HTTPException(
@@ -91,6 +97,7 @@ def create_ticket(data: TicketCreate, db: Session, current_user: User) -> Ticket
         )
 
     ticket = Ticket(id=_generate_ticket_id(db), **data.model_dump())
+    ticket.created_by = current_user.id
     db.add(ticket)
     db.commit()
     db.refresh(ticket)
@@ -109,9 +116,20 @@ def resolve_ticket(
     return ticket
 
 
+def set_status(
+    ticket_id: str,
+    status: str,
+    db: Session,
+    current_user: User,
+) -> Ticket:
+    ticket = get_ticket(ticket_id, db, current_user)
+    ticket.status = status
+    db.commit()
+    db.refresh(ticket)
+    return ticket
+
+
 def _can_access_ticket(ticket: Ticket, current_user: User) -> bool:
-    if current_user.role == UserRole.SUPERADMIN.value:
-        return True
     if current_user.role == UserRole.ADMIN.value:
         return ticket.department_id == current_user.department_id
     if current_user.role == UserRole.AGENT.value:

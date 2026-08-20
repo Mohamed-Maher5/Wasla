@@ -326,10 +326,19 @@ def ask_question(
 
     answer = _generate_answer(question, top_chunks, history=history)
 
+    # Only surface a source if the model actually cited it in the answer
+    # (greetings, small talk, and "not found in the documents" replies
+    # cite nothing and must not show sources — see system_prompt). We
+    # don't trust top_chunks alone here: those are everything RETRIEVED
+    # and handed to the model as candidate context, not everything it
+    # actually used. The model is instructed to cite the filename
+    # verbatim, so we check for that.
+    used_chunks = [c for c in top_chunks if c.document.filename in answer]
+
     # One source entry per document actually used (not per chunk), so the
     # same file doesn't show up several times. Page numbers from every
     # relevant chunk of that document are merged into one snippet entry.
-    sources = _build_sources(top_chunks)
+    sources = _build_sources(used_chunks)
 
     latency_ms = int((time.time() - start) * 1000)
 

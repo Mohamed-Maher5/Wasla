@@ -61,6 +61,10 @@ export async function callCustomer(ticketId, token) {
   });
 }
 
+export async function getCallStatus(callId, token) {
+  return request(`/telephony/status/${callId}`, { token });
+}
+
 export async function resolveTicket(ticketId, token) {
   return updateTicketStatus(ticketId, "resolved", token);
 }

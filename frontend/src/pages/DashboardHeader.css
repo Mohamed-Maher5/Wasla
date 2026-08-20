@@ -1,0 +1,72 @@
+/* Shared dashboard header — same pattern used across all dashboards. */
+
+.sa-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 28px;
+  padding: 18px 24px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+}
+
+.sa-header-brand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.sa-header-text {
+  display: grid;
+  gap: 2px;
+}
+
+.sa-logo {
+  height: 44px;
+  width: auto;
+}
+
+.sa-header-title {
+  color: #111827;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.sa-header-title strong {
+  color: #2563eb;
+}
+
+.sa-header-name {
+  color: #6b7280;
+}
+
+.sa-header-subtitle {
+  color: #6b7280;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.sa-logout {
+  padding: 10px 18px;
+  border: 1px solid #fecaca;
+  border-radius: 9px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.sa-logout:hover {
+  background: #fee2e2;
+}
+
+@media (max-width: 600px) {
+  .sa-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 14px;
+  }
+}

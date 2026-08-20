@@ -25,6 +25,20 @@ def trigger_call(data: TriggerCallRequest, db: Session = Depends(get_db)) -> Cal
     return start_call(data.phone_number, db)
 
 
+@router.get("/status/{call_id}", response_model=CallAttemptOut)
+def get_call_status(call_id: int, db: Session = Depends(get_db)) -> CallAttemptOut:
+    call_attempt = (
+        db.query(CallAttempt).filter(CallAttempt.id == call_id).one_or_none()
+    )
+    if call_attempt is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Call attempt not found",
+        )
+
+    return call_attempt
+
+
 @router.api_route("/audio/{filename}", methods=["GET", "HEAD"])
 def get_audio(filename: str) -> FileResponse:
     path = STATIC_DIR / Path(filename).name

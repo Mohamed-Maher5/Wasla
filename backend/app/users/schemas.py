@@ -17,5 +17,6 @@ class UserOut(BaseModel):
     email: str
     role: str
     department_id: int | None
+    created_by: int | None
 
     model_config = ConfigDict(from_attributes=True)

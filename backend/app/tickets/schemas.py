@@ -2,6 +2,7 @@
 # It keeps ticket data consistent between API callers and backend logic.
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -16,6 +17,10 @@ class TicketCreate(BaseModel):
     department_id: int
 
 
+class TicketStatusUpdate(BaseModel):
+    status: Literal[TicketStatus.RESOLVED.value, TicketStatus.UNRESOLVED.value]
+
+
 class TicketOut(BaseModel):
     id: str
     client_name: str
@@ -24,6 +29,7 @@ class TicketOut(BaseModel):
     assigned_to: int
     status: str
     department_id: int
+    created_by: int | None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

@@ -203,11 +203,15 @@ function Documents({ token, user, onBack, initialDeptId }) {
             <h3>لا توجد مستندات حالياً</h3>
 
             <p>
-              اضغط على "رفع مستند" لإضافة أول ملف.
+              اضغط على "رفع أول مستند" لإضافة ملف.
             </p>
 
-            <button className="upload-button secondary" onClick={handleUploadClick}>
-              رفع أول مستند
+            <button
+              className="upload-button secondary"
+              onClick={handleUploadClick}
+              disabled={uploading}
+            >
+              {uploading ? "جاري الرفع..." : "رفع أول مستند"}
             </button>
           </div>
         )}
