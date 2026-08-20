@@ -98,7 +98,7 @@ function Documents({ token, user, onBack, initialDeptId }) {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".pdf,.docx"
+        accept=".pdf,.docx,.png,.jpg,.jpeg,.bmp,.tiff,.tif,.webp"
         style={{ display: "none" }}
         onChange={handleFileChange}
       />
@@ -138,13 +138,15 @@ function Documents({ token, user, onBack, initialDeptId }) {
             ← العودة
           </button>
 
-          <button
-            className="upload-button"
-            onClick={handleUploadClick}
-            disabled={uploading}
-          >
-            {uploading ? "جاري الرفع..." : "+ رفع مستند"}
-          </button>
+          {!isSuperadmin && (
+            <button
+              className="upload-button"
+              onClick={handleUploadClick}
+              disabled={uploading}
+            >
+              {uploading ? "جاري الرفع..." : "+ رفع مستند"}
+            </button>
+          )}
         </div>
       </header>
 

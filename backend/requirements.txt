@@ -8,3 +8,10 @@ passlib[bcrypt]
 python-multipart
 pgvector
 vonage
+groq
+pypdf
+python-docx
+requests
+pymupdf
+pytesseract
+pillow
