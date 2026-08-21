@@ -18,7 +18,7 @@ function ChatPanel({ token, user, fullWidth, departmentId }) {
   const [messages, setMessages] = useState([GREETING]);
   const [conversationId, setConversationId] = useState(null);
   const [conversations, setConversations] = useState([]);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const messagesEndRef = useRef(null);
@@ -147,19 +147,16 @@ function ChatPanel({ token, user, fullWidth, departmentId }) {
   return (
     <div className={`chat-panel-layout ${sidebarOpen ? "" : "chat-panel-layout--collapsed"}`}>
       <div className="chat-sidebar">
-        <div className="chat-sidebar-header">
-          <button className="chat-sidebar-toggle" onClick={() => setSidebarOpen((v) => !v)}>
-            {sidebarOpen ? "«" : "»"}
+<div className="chat-sidebar-header">
+          <button className="chat-new-btn" onClick={startNewConversation}>
+            + محادثة جديدة
           </button>
-          {sidebarOpen && (
-            <button className="chat-new-btn" onClick={startNewConversation}>
-              + محادثة جديدة
-            </button>
-          )}
+          <button className="chat-sidebar-toggle" onClick={() => setSidebarOpen((v) => !v)}>
+            {sidebarOpen ? "»" : "«"}
+          </button>
         </div>
 
-        {sidebarOpen && (
-          <div className="chat-conversation-list">
+        <div className="chat-conversation-list">
             {conversations.length === 0 && (
               <p className="chat-conversation-empty">لا توجد محادثات سابقة</p>
             )}
@@ -179,13 +176,12 @@ function ChatPanel({ token, user, fullWidth, departmentId }) {
                 </button>
               </div>
             ))}
-          </div>
-        )}
+        </div>
       </div>
 
       <aside className={panelClass} aria-label="Agent chat panel">
         <div className="chat-panel-header">
-          <h2>مساعد Wasla</h2>
+          <h2>مساعد ( وَصْلَة )</h2>
         </div>
 
         <div className="chat-messages">

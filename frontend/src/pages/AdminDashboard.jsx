@@ -12,6 +12,7 @@ import {
   uploadDocument,
 } from "../api";
 import DashboardHeader from "./DashboardHeader";
+import ChatPanel from "../components/ChatPanel";
 import "./AdminDashboard.css";
 
 const initialAgentForm = {
@@ -224,7 +225,13 @@ function AdminDashboard({ token, user, onLogout }) {
       {error && <p className="dashboard-alert error">{error}</p>}
       {message && <p className="dashboard-alert success">{message}</p>}
 
-      <section className="sa-workspace">
+      <section
+        className={
+          activeSection === "chat"
+            ? "sa-workspace sa-workspace--chat"
+            : "sa-workspace"
+        }
+      >
         <nav className="sa-tabs">
           <button
             className={activeSection === "agents" ? "sa-tab active" : "sa-tab"}
@@ -250,8 +257,23 @@ function AdminDashboard({ token, user, onLogout }) {
           >
             رفع ملف
           </button>
+
+          <button
+            className={
+              activeSection === "chat" ? "sa-tab active" : "sa-tab"
+            }
+            onClick={() => setActiveSection("chat")}
+          >
+            محادثه البوت
+          </button>
         </nav>
 
+        {activeSection === "chat" ? (
+          <div className="admin-chat-section">
+            <ChatPanel token={token} user={user} fullWidth />
+          </div>
+        ) : (
+          <>
         <div className="sa-create-box">
           {activeSection === "agents" && (
             <form className="management-form" onSubmit={handleAgentSubmit}>
@@ -338,7 +360,9 @@ function AdminDashboard({ token, user, onLogout }) {
                     updateTicketForm("assigned_to", event.target.value)
                   }
                 >
-                  <option value="">اختر وكيل...</option>
+                  <option value="" disabled hidden>
+                    اختر
+                  </option>
                   {agents.map((agent) => (
                     <option key={agent.id} value={agent.id}>
                       {agent.name}
@@ -471,6 +495,8 @@ function AdminDashboard({ token, user, onLogout }) {
             </>
           )}
         </div>
+          </>
+        )}
       </section>
     </div>
   );

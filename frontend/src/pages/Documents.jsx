@@ -41,8 +41,6 @@ function Documents({ token, user, onBack, initialDeptId }) {
         setDepartments(data);
         if (initialDeptId != null) {
           setSelectedDeptId(initialDeptId);
-        } else if (!selectedDeptId && data.length > 0) {
-          setSelectedDeptId(data[0].id);
         }
       } catch (err) {
         setError(err.message);
@@ -126,6 +124,9 @@ function Documents({ token, user, onBack, initialDeptId }) {
               onChange={(e) => setSelectedDeptId(Number(e.target.value))}
               disabled={isLockedDept}
             >
+              <option value="" disabled hidden>
+                اختر
+              </option>
               {departments.map((dept) => (
                 <option key={dept.id} value={dept.id}>
                   {dept.name}

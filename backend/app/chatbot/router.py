@@ -200,7 +200,7 @@ def delete_conversation_endpoint(
 def ask_chatbot(
     payload: ChatQueryIn,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("agent")),
+    current_user: User = Depends(require_role("agent", "admin")),
 ):
     if not payload.question.strip():
         raise HTTPException(status_code=400, detail="Question is empty")
@@ -244,7 +244,7 @@ def ask_chatbot(
 def submit_feedback(
     payload: ChatFeedbackIn,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("agent")),
+    current_user: User = Depends(require_role("agent", "admin")),
 ):
     try:
         service.submit_feedback(db=db, log_id=payload.log_id, feedback=payload.feedback)

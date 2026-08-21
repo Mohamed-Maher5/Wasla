@@ -145,10 +145,7 @@ function SuperadminDashboard({ token, user, onLogout }) {
         token,
       );
       setUsers((currentUsers) => [...currentUsers, created]);
-      setUserForm({
-        ...initialUserForm,
-        department_id: departments[0]?.id ? String(departments[0].id) : "",
-      });
+      setUserForm(initialUserForm);
       flashMessage("تم انشاء مسؤل");
     } catch (err) {
       flashMessage("", "فشل في انشاء مسؤل");
@@ -168,15 +165,6 @@ function SuperadminDashboard({ token, user, onLogout }) {
       [field]: value,
     }));
   }
-
-  useEffect(() => {
-    if (!userForm.department_id && departments.length > 0) {
-      setUserForm((currentForm) => ({
-        ...currentForm,
-        department_id: String(departments[0].id),
-      }));
-    }
-  }, [departments, userForm.department_id]);
 
   return (
     <div className="superadmin-dashboard" dir="rtl">
@@ -279,7 +267,9 @@ function SuperadminDashboard({ token, user, onLogout }) {
 
                 {departments.map((department) => (
                   <div className="sa-info-card" key={department.id}>
-                    <strong className="sa-card-name">{department.name}</strong>
+                    <strong className="sa-card-name">
+                      قسم : {department.name}
+                    </strong>
                     <span className="sa-card-stat">
                       عدد المسؤلين: {departmentAdminCount(department.id)}
                     </span>
@@ -338,11 +328,14 @@ function SuperadminDashboard({ token, user, onLogout }) {
                   <select
                     required
                     value={userForm.department_id}
-                    onChange={(event) =>
-                      updateUserForm("department_id", event.target.value)
-                    }
-                  >
-                    {departments.map((department) => (
+                      onChange={(event) =>
+                        updateUserForm("department_id", event.target.value)
+                      }
+                    >
+                      <option value="" disabled hidden>
+                        اختر
+                      </option>
+                      {departments.map((department) => (
                       <option key={department.id} value={department.id}>
                         {department.name}
                       </option>
@@ -367,9 +360,14 @@ function SuperadminDashboard({ token, user, onLogout }) {
 
                 {admins.map((admin) => (
                   <div className="sa-info-card" key={admin.id}>
-                    <strong className="sa-card-name">{admin.name}</strong>
-                    <span className="sa-card-stat">{admin.email}</span>
+                    <strong className="sa-card-name">
+                      الاسم: {admin.name}
+                    </strong>
                     <span className="sa-card-stat">
+                      البريد الإلكتروني: {admin.email}
+                    </span>
+                    <span className="sa-card-stat">
+                      القسم:{" "}
                       {departmentById[admin.department_id]?.name ||
                         `Department ${admin.department_id || "-"}`}
                     </span>
