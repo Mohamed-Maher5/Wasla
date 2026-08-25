@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     elevenlabs_api_key: str = ""
     elevenlabs_voice_id: str = ""
     huggingface_api_key: str = ""
+    tavily_api_key: str = ""  # web-search fallback for the RAG chatbot (https://tavily.com)
 
     model_config = SettingsConfigDict(env_file=BASE_DIR / ".env")
 

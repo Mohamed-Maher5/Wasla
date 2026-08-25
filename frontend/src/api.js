@@ -144,8 +144,8 @@ export async function deleteConversation(conversationId, token) {
   });
 }
 
-export async function chatQuery(question, token, departmentId, history = [], conversationId = null) {
-  const body = { question, history, conversation_id: conversationId };
+export async function chatQuery(question, token, departmentId, history = [], conversationId = null, persona = "general") {
+  const body = { question, history, conversation_id: conversationId, persona };
   if (departmentId != null) {
     body.department_id = departmentId;
   }
@@ -156,12 +156,99 @@ export async function chatQuery(question, token, departmentId, history = [], con
   });
 }
 
+export async function getPersonas(token) {
+  return request("/chat/personas", { token });
+}
+
+export async function generateSqlQuery(question, token, departmentId) {
+  const body = { question };
+  if (departmentId != null) {
+    body.department_id = departmentId;
+  }
+  return request("/chat/sql/generate", {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export async function executeSqlQuery(pendingId, token, conversationId = null) {
+  return request("/chat/sql/execute", {
+    method: "POST",
+    token,
+    body: JSON.stringify({ pending_id: pendingId, conversation_id: conversationId }),
+  });
+}
+
 export async function chatFeedback(data, token) {
   return request("/chat/feedback", {
     method: "POST",
     token,
     body: JSON.stringify(data),
   });
+}
+
+export async function chatWebSearch(question, token, departmentId, history = [], conversationId) {
+  const body = { question, history, conversation_id: conversationId };
+  if (departmentId != null) {
+    body.department_id = departmentId;
+  }
+  return request("/chat/web-search", {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+// Uploads a recorded voice message (Blob from MediaRecorder) and returns
+// { text } with the transcription, to drop into the chat input.
+export async function transcribeVoice(audioBlob, token) {
+  const formData = new FormData();
+  formData.append("file", audioBlob, "voice-message.webm");
+
+  const response = await fetch(`${API_BASE_URL}/chat/voice/transcribe`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  const text = await response.text();
+  const data = text ? JSON.parse(text) : null;
+
+  if (!response.ok) {
+    throw new Error(data?.detail || "Transcription failed");
+  }
+
+  return data;
+}
+
+// Requests narrated audio for a piece of text and returns a playable
+// object URL. Caller is responsible for revoking it when done.
+export async function speakText(text, token) {
+  const response = await fetch(`${API_BASE_URL}/chat/voice/speak`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ text }),
+  });
+
+  if (!response.ok) {
+    let detail = "Speech synthesis failed";
+    try {
+      const data = await response.json();
+      detail = data?.detail || detail;
+    } catch {
+      // response wasn't JSON — keep default message
+    }
+    throw new Error(detail);
+  }
+
+  const audioBlob = await response.blob();
+  return URL.createObjectURL(audioBlob);
 }
 
 function updateTicketStatus(ticketId, status, token) {

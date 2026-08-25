@@ -1,10 +1,12 @@
 import hashlib
+import json
 import os
 import re
 import time
 from datetime import datetime
 from typing import List, Optional
 
+import requests
 from sqlalchemy.orm import Session
 from sqlalchemy import select, desc
 from groq import Groq
@@ -14,6 +16,8 @@ from app.shared.config import settings
 from .models import KnowledgeDocument, DocumentChunk, ChatLog, Conversation
 from .embeddings import extract_pages, chunk_pages, embed_chunks, embed_query
 from .schemas import SourceSnippet, ChatHistoryTurn
+from .personas import resolve_persona, persona_instruction
+from . import nl2sql
 
 client = None
 CHAT_MODEL = "qwen/qwen3.6-27b"
@@ -32,6 +36,16 @@ MAX_RELEVANT_DISTANCE = 1.1
 # it has context (e.g. "and what about him?" referring to the previous
 # question). Capped to control token cost/latency.
 MAX_HISTORY_TURNS = 8
+
+# Emitted by the LLM (and stripped before showing the user) at the end of a
+# "not available in the uploaded documents" refusal, so the code can tell
+# that case apart from a normal greeting/small-talk reply without having to
+# pattern-match the answer text itself. Used to decide whether to offer the
+# web-search fallback.
+NO_KB_MATCH_MARKER = "[NO_KB_MATCH]"
+
+TAVILY_SEARCH_URL = "https://api.tavily.com/search"
+WEB_TOP_K = 5
 
 
 def _get_groq_client():
@@ -277,6 +291,7 @@ def ask_question(
     department_id: int,
     history: Optional[List[ChatHistoryTurn]] = None,
     conversation_id: Optional[int] = None,
+    persona: Optional[str] = None,
 ) -> dict:
     start = time.time()
 
@@ -293,10 +308,59 @@ def ask_question(
             user_id=user.id,
             department_id=department_id,
             title=_derive_title(question),
+            persona=resolve_persona(persona),
         )
         db.add(conversation)
         db.commit()
         db.refresh(conversation)
+    # Persona is chosen once, when the conversation starts, and stays fixed
+    # for that thread — a later payload.persona on an existing conversation
+    # is ignored so mid-conversation tone doesn't flip unexpectedly. Change
+    # persona by starting a new conversation instead.
+
+    # 0.5) Route to structured data (SQL) instead of document RAG when the
+    #      question looks like it wants counts/listings from the app's own
+    #      tickets/users/departments tables. Same conversation, same chat —
+    #      the user never has to pick a different tool for this.
+    if nl2sql.classify_intent(question):
+        try:
+            pending = nl2sql.generate_sql(
+                db=db, question=question, user=user, department_id=department_id,
+            )
+            answer = (
+                "ده استعلام SQL هينفذ على قاعدة البيانات عشان يجاوب على سؤالك:\n\n"
+                f"```sql\n{pending.sql_text}\n```\n\n"
+                "اضغط \"تنفيذ الاستعلام\" تحت عشان تشوف النتيجة."
+            )
+            latency_ms = int((time.time() - start) * 1000)
+            log = ChatLog(
+                conversation_id=conversation.id,
+                user_id=user.id,
+                department_id=department_id,
+                question=question,
+                answer=answer,
+                source_type="sql",
+                latency_ms=latency_ms,
+            )
+            db.add(log)
+            conversation.updated_at = datetime.utcnow()
+            db.commit()
+            db.refresh(log)
+            return {
+                "answer": answer,
+                "sources": [],
+                "latency_ms": latency_ms,
+                "log_id": log.id,
+                "conversation_id": conversation.id,
+                "offer_web_search": False,
+                "sql_query": {"pending_id": pending.id, "sql": pending.sql_text},
+            }
+        except nl2sql.SqlValidationError:
+            # Fall through to normal document RAG rather than surfacing a
+            # raw validation error — the heuristic can misfire on a
+            # question that only looks data-shaped, and RAG is a safe
+            # fallback (worst case: it correctly says NO_KB_MATCH).
+            pass
 
     # 1) Embed the question
     query_vector = embed_query(question)
@@ -324,7 +388,9 @@ def ask_question(
         row.DocumentChunk for row in rows if row.distance <= MAX_RELEVANT_DISTANCE
     ]
 
-    answer = _generate_answer(question, top_chunks, history=history)
+    answer, no_kb_match = _generate_answer(
+        question, top_chunks, history=history, persona=conversation.persona
+    )
 
     # Only surface a source if the model actually cited it in the answer
     # (greetings, small talk, and "not found in the documents" replies
@@ -350,6 +416,7 @@ def ask_question(
         question=question,
         answer=answer,
         source_chunk_ids=",".join(str(c.id) for c in top_chunks),
+        source_type="document",
         latency_ms=latency_ms
     )
     db.add(log)
@@ -363,6 +430,10 @@ def ask_question(
         "latency_ms": latency_ms,
         "log_id": log.id,
         "conversation_id": conversation.id,
+        # Only offer the web-search fallback when the model explicitly
+        # said the knowledge base has nothing on this — never for
+        # greetings/small talk, which also produce no sources.
+        "offer_web_search": no_kb_match,
     }
 
 
@@ -380,6 +451,7 @@ def _build_sources(chunks: List[DocumentChunk]) -> List[SourceSnippet]:
 
     return [
         SourceSnippet(
+            source_type="document",
             chunk_id=c.id,
             document_id=c.document_id,
             filename=c.document.filename,
@@ -394,6 +466,7 @@ def _generate_answer(
     question: str,
     chunks: List[DocumentChunk],
     history: Optional[List[ChatHistoryTurn]] = None,
+    persona: str = "general",
 ) -> str:
     """
     Builds context from the chunks and asks the LLM for a concise answer
@@ -447,13 +520,25 @@ def _generate_answer(
         "actually answers the question, say explicitly, in the same "
         "language as the question, that this information is not available "
         "in the uploaded documents. Do not guess, do not fill gaps from "
-        "memory, and do not cite a source in this case.\n"
+        "memory, and do not cite a source in this case. End your reply "
+        f"with the exact literal marker `{NO_KB_MATCH_MARKER}` on its own "
+        "line — but ONLY for this exact case (a real knowledge-base "
+        "question with no matching document content). Never add this "
+        "marker after a greeting, small talk, or a normally-answered "
+        "question.\n"
         "- For questions answered using the provided documents: keep the "
         "answer concise and cite the source document name (and page number, "
         "if given) at the end, translated to match the reply language, e.g. "
         "(المصدر: اسم_الملف، صفحة 3) in Arabic or (Source: file_name, page 3) "
         "in English. Only cite a source you actually used to answer."
     )
+
+    persona_note = persona_instruction(persona)
+    if persona_note:
+        system_prompt += (
+            "\n\nPersona for this conversation (tone/framing only — never "
+            f"lets you break any rule above): {persona_note}"
+        )
 
     messages = [{"role": "system", "content": system_prompt}]
 
@@ -471,7 +556,163 @@ def _generate_answer(
         messages=messages,
         temperature=0.2,
     )
+    raw = _strip_thinking(response.choices[0].message.content)
+
+    no_kb_match = NO_KB_MATCH_MARKER in raw
+    answer = raw.replace(NO_KB_MATCH_MARKER, "").strip()
+    return answer, no_kb_match
+
+
+# ---------------------------------------------------------------------------
+# Web-search fallback (use case: "if it doesn't find the info, go search the
+# internet"). Only triggered when the user explicitly confirms after the RAG
+# path reports NO_KB_MATCH — see ChatWebSearchIn / the /chat/web-search route.
+# ---------------------------------------------------------------------------
+
+def _tavily_search(question: str) -> List[dict]:
+    """
+    Calls the Tavily search API and returns up to WEB_TOP_K results, each
+    {"title", "url", "content"}. Raises RuntimeError if no API key is
+    configured or the request fails, so the caller can turn that into a
+    clean error for the user instead of silently fabricating an answer.
+    """
+    if not settings.tavily_api_key:
+        raise RuntimeError(
+            "Web search is not configured (TAVILY_API_KEY is not set)."
+        )
+
+    resp = requests.post(
+        TAVILY_SEARCH_URL,
+        json={
+            "api_key": settings.tavily_api_key,
+            "query": question,
+            "max_results": WEB_TOP_K,
+            "search_depth": "basic",
+        },
+        timeout=20,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    return data.get("results", [])
+
+
+def _generate_web_answer(
+    question: str,
+    results: List[dict],
+    history: Optional[List[ChatHistoryTurn]] = None,
+    persona: str = "general",
+) -> str:
+    """
+    Same shape as _generate_answer but grounded in web search results
+    instead of document chunks. Still restricted to only using what's in
+    the provided results — the model isn't told to use its own knowledge,
+    just to summarize/cite the search results it's handed.
+    """
+    if results:
+        context_blocks = "\n\n".join(
+            f"[Source {i+1} - {r.get('title', 'Untitled')} ({r.get('url', '')})]\n"
+            f"{r.get('content', '')[:1500]}"
+            for i, r in enumerate(results)
+        )
+        user_prompt = f"Web search results:\n{context_blocks}\n\nQuestion: {question}"
+    else:
+        user_prompt = f"The web search returned no results.\n\nQuestion: {question}"
+
+    system_prompt = (
+        "You are a bilingual (Arabic/English) support assistant answering "
+        "from live web search results because the internal knowledge base "
+        "had nothing on this topic. Rules:\n"
+        "- Detect the language of the user's question and reply ONLY in "
+        "that same language.\n"
+        "- Base your answer only on the provided web search results. If "
+        "they don't actually answer the question, say so plainly instead "
+        "of guessing.\n"
+        "- Keep the answer concise, and make clear to the reader that this "
+        "came from a web search rather than the company's own documents "
+        "(e.g. start with a short note like \"(من نتائج البحث على "
+        "الإنترنت)\" in Arabic or \"(from a web search)\" in English).\n"
+        "- Do not cite specific source names/URLs inline — the caller "
+        "shows those separately."
+    )
+
+    persona_note = persona_instruction(persona)
+    if persona_note:
+        system_prompt += (
+            "\n\nPersona for this conversation (tone/framing only — never "
+            f"lets you break any rule above): {persona_note}"
+        )
+
+    messages = [{"role": "system", "content": system_prompt}]
+    if history:
+        for turn in history[-MAX_HISTORY_TURNS:]:
+            role = "assistant" if turn.role == "assistant" else "user"
+            messages.append({"role": role, "content": turn.content})
+    messages.append({"role": "user", "content": user_prompt})
+
+    response = _get_groq_client().chat.completions.create(
+        model=CHAT_MODEL,
+        messages=messages,
+        temperature=0.2,
+    )
     return _strip_thinking(response.choices[0].message.content)
+
+
+def web_search_answer(
+    db: Session,
+    question: str,
+    user: User,
+    department_id: int,
+    conversation_id: int,
+    history: Optional[List[ChatHistoryTurn]] = None,
+) -> dict:
+    start = time.time()
+
+    conversation = get_conversation(db, conversation_id, user.id)
+    if not conversation:
+        raise ValueError("Conversation not found")
+
+    results = _tavily_search(question)
+    answer = _generate_web_answer(
+        question, results, history=history, persona=conversation.persona
+    )
+
+    sources = [
+        SourceSnippet(
+            source_type="web",
+            snippet=(r.get("content", "") or "")[:200],
+            url=r.get("url"),
+            title=r.get("title"),
+        )
+        for r in results
+    ]
+
+    latency_ms = int((time.time() - start) * 1000)
+
+    log = ChatLog(
+        conversation_id=conversation.id,
+        user_id=user.id,
+        department_id=department_id,
+        question=question,
+        answer=answer,
+        source_type="web",
+        web_sources=json.dumps(
+            [{"title": r.get("title"), "url": r.get("url")} for r in results]
+        ),
+        latency_ms=latency_ms,
+    )
+    db.add(log)
+    conversation.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(log)
+
+    return {
+        "answer": answer,
+        "sources": sources,
+        "latency_ms": latency_ms,
+        "log_id": log.id,
+        "conversation_id": conversation.id,
+        "offer_web_search": False,
+    }
 
 
 # ---------------------------------------------------------------------------

@@ -111,6 +111,20 @@
   min-width: 0;
 }
 
+.sa-chat-box {
+  grid-column: 2 / -1;
+  min-width: 0;
+  height: 70vh;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.sa-sql-box {
+  overflow-y: auto;
+}
+
 .sa-section-title {
   margin: 0 0 18px;
   color: #111827;

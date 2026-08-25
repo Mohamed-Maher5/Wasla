@@ -67,6 +67,7 @@ class Conversation(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
     title = Column(String(255), nullable=False, default="محادثة جديدة")
+    persona = Column(String(30), nullable=False, default="general")  # see chatbot/personas.py
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -93,8 +94,29 @@ class ChatLog(Base):
     question = Column(Text, nullable=False)
     answer = Column(Text, nullable=True)
     source_chunk_ids = Column(String(255), nullable=True)  # e.g. "12,45,9"
+    source_type = Column(String(20), nullable=False, default="document")  # "document" or "web"
+    web_sources = Column(Text, nullable=True)  # JSON list of {"title","url"} when source_type="web"
     latency_ms = Column(Integer, nullable=True)
     feedback = Column(String(20), nullable=True)  # "up" / "down" / null
     created_at = Column(DateTime, default=datetime.utcnow)
 
     conversation = relationship("Conversation", back_populates="logs")
+
+
+class PendingSqlQuery(Base):
+    """
+    A generated-but-not-yet-executed NL->SQL query, awaiting user approval.
+    Storing it server-side (instead of round-tripping the SQL text through
+    the client) means the /chat/sql/execute endpoint only ever runs SQL
+    this backend itself generated and validated — a client can't submit
+    arbitrary SQL by editing the approval request.
+    """
+    __tablename__ = "pending_sql_queries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
+    question = Column(Text, nullable=False)
+    sql_text = Column(Text, nullable=False)
+    executed = Column(String(1), nullable=False, default="0")  # "0"/"1" — one-shot execute guard
+    created_at = Column(DateTime, default=datetime.utcnow)

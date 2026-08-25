@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Form, UploadFile, File, HTTPException
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app.shared.database import get_db
@@ -7,13 +8,30 @@ from app.auth.models import User
 from app.departments.models import Department
 
 from . import service
+from .personas import PERSONAS
+from . import nl2sql
+from . import voice
+from datetime import datetime
+from .models import PendingSqlQuery, ChatLog
 from .schemas import (
     DocumentUploadOut, ChatQueryIn, ChatQueryOut,
     ChatFeedbackIn, ChatHistoryItem, ConversationOut,
-    ConversationDetailOut
+    ConversationDetailOut, ChatWebSearchIn,
+    SqlGenerateIn, SqlGenerateOut, SqlExecuteIn, SqlExecuteOut,
+    VoiceTranscribeOut, VoiceSpeakIn,
 )
 
 router = APIRouter(prefix="", tags=["chatbot"])
+
+
+@router.get("/chat/personas")
+def get_personas(
+    current_user: User = Depends(require_role("superadmin", "admin", "agent")),
+):
+    """Powers the persona dropdown in the chat UI."""
+    return [
+        {"id": key, "label": val["label"]} for key, val in PERSONAS.items()
+    ]
 
 
 @router.post("/chat/documents", response_model=DocumentUploadOut)
@@ -173,6 +191,7 @@ def get_conversation_detail(
     return ConversationDetailOut(
         id=conversation.id,
         title=conversation.title,
+        persona=conversation.persona,
         created_at=conversation.created_at,
         messages=[
             ChatHistoryItem(
@@ -200,7 +219,7 @@ def delete_conversation_endpoint(
 def ask_chatbot(
     payload: ChatQueryIn,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("agent")),
+    current_user: User = Depends(require_role("superadmin", "admin", "agent")),
 ):
     if not payload.question.strip():
         raise HTTPException(status_code=400, detail="Question is empty")
@@ -230,7 +249,7 @@ def ask_chatbot(
         result = service.ask_question(
             db=db, question=payload.question, user=current_user,
             department_id=department_id, history=payload.history,
-            conversation_id=payload.conversation_id,
+            conversation_id=payload.conversation_id, persona=payload.persona,
         )
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -240,11 +259,57 @@ def ask_chatbot(
     return result
 
 
+@router.post("/chat/web-search", response_model=ChatQueryOut)
+def ask_chatbot_web_search(
+    payload: ChatWebSearchIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("superadmin", "admin", "agent")),
+):
+    """
+    Explicit web-search fallback: called only after the normal /chat/query
+    answer came back with offer_web_search=True and the user confirmed they
+    want it. Never triggered automatically.
+    """
+    if not payload.question.strip():
+        raise HTTPException(status_code=400, detail="Question is empty")
+
+    if current_user.role == "superadmin":
+        if payload.department_id is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Superadmin must specify a department_id",
+            )
+        department_id = payload.department_id
+    else:
+        department_id = current_user.department_id
+        if department_id is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Your account is not assigned to any department",
+            )
+
+    try:
+        result = service.web_search_answer(
+            db=db, question=payload.question, user=current_user,
+            department_id=department_id, conversation_id=payload.conversation_id,
+            history=payload.history,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except RuntimeError as e:
+        # e.g. TAVILY_API_KEY not configured
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Web search failed: {e}")
+
+    return result
+
+
 @router.post("/chat/feedback")
 def submit_feedback(
     payload: ChatFeedbackIn,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("agent")),
+    current_user: User = Depends(require_role("superadmin", "admin", "agent")),
 ):
     try:
         service.submit_feedback(db=db, log_id=payload.log_id, feedback=payload.feedback)
@@ -252,3 +317,147 @@ def submit_feedback(
         raise HTTPException(status_code=400, detail=str(e))
 
     return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Voice mode (speech-to-text for the mic input, text-to-speech for reading
+# answers aloud). Two independent endpoints rather than baking this into
+# /chat/query: the recording step and the "please read this answer" step
+# don't always happen together (e.g. a restored conversation's messages can
+# be replayed without re-transcribing anything), and keeping them separate
+# means a TTS failure never blocks the actual chat answer from coming back.
+# ---------------------------------------------------------------------------
+
+@router.post("/chat/voice/transcribe", response_model=VoiceTranscribeOut)
+async def transcribe_voice_message(
+    file: UploadFile = File(...),
+    current_user: User = Depends(require_role("superadmin", "admin", "agent")),
+):
+    """Converts a recorded voice message into text for the chat input box."""
+    audio_bytes = await file.read()
+
+    try:
+        text = voice.transcribe_audio(audio_bytes, filename=file.filename)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Transcription failed: {e}")
+
+    if not text:
+        raise HTTPException(status_code=422, detail="Could not transcribe any speech from the recording")
+
+    return VoiceTranscribeOut(text=text)
+
+
+@router.post("/chat/voice/speak")
+def speak_text(
+    payload: VoiceSpeakIn,
+    current_user: User = Depends(require_role("superadmin", "admin", "agent")),
+):
+    """Returns narrated WAV audio for a given piece of text (typically an assistant answer)."""
+    if not payload.text.strip():
+        raise HTTPException(status_code=400, detail="No text to speak")
+
+    try:
+        audio_bytes = voice.synthesize_speech(payload.text)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Speech synthesis failed: {e}")
+
+    return Response(content=audio_bytes, media_type="audio/wav")
+
+
+# ---------------------------------------------------------------------------
+# NL -> SQL (structured data queries over Wasla's own tickets/users/departments)
+# Two steps by design: generate (review-only) then execute (explicit
+# approval), and execute only ever runs SQL this backend generated and
+# validated itself — never SQL text coming back from the client.
+# ---------------------------------------------------------------------------
+
+def _resolve_sql_department_id(
+    db: Session, current_user: User, payload_department_id: int | None
+) -> int | None:
+    if current_user.role == "superadmin":
+        # superadmin may leave this unset to query across all departments
+        if payload_department_id is not None and not db.get(Department, payload_department_id):
+            raise HTTPException(status_code=400, detail=f"department_id {payload_department_id} does not exist")
+        return payload_department_id
+    department_id = current_user.department_id
+    if department_id is None:
+        raise HTTPException(status_code=400, detail="Your account is not assigned to any department")
+    return department_id
+
+
+@router.post("/chat/sql/generate", response_model=SqlGenerateOut)
+def generate_sql_query(
+    payload: SqlGenerateIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("superadmin", "admin", "agent")),
+):
+    if not payload.question.strip():
+        raise HTTPException(status_code=400, detail="Question is empty")
+
+    department_id = _resolve_sql_department_id(db, current_user, payload.department_id)
+
+    try:
+        pending = nl2sql.generate_sql(
+            db=db, question=payload.question, user=current_user, department_id=department_id
+        )
+    except nl2sql.SqlValidationError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"SQL generation failed: {e}")
+
+    return SqlGenerateOut(pending_id=pending.id, sql=pending.sql_text, question=pending.question)
+
+
+@router.post("/chat/sql/execute", response_model=SqlExecuteOut)
+def execute_sql_query(
+    payload: SqlExecuteIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("superadmin", "admin", "agent")),
+):
+    pending = db.get(PendingSqlQuery, payload.pending_id)
+    if not pending or pending.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="No such pending query")
+
+    try:
+        # Re-run the same static validation right before execution too —
+        # cheap, and covers the (currently theoretical) case of this row
+        # having been tampered with directly in the DB.
+        nl2sql.validate_sql(pending.sql_text, user=current_user, department_id=pending.department_id)
+        result = nl2sql.execute_sql(db, pending)
+    except nl2sql.SqlValidationError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"SQL execution failed: {e}")
+
+    log_id = None
+    if payload.conversation_id is not None:
+        conversation = service.get_conversation(db, payload.conversation_id, current_user.id)
+        if conversation:
+            preview_rows = result["rows"][:20]
+            table_text = " | ".join(result["columns"]) + "\n" + "\n".join(
+                " | ".join(str(v) for v in row) for row in preview_rows
+            ) if result["rows"] else "لا توجد نتائج."
+            answer = f"نتيجة الاستعلام ({result['row_count']} صف):\n\n{table_text}"
+            log = ChatLog(
+                conversation_id=conversation.id,
+                user_id=current_user.id,
+                department_id=conversation.department_id,
+                question=f"[تنفيذ SQL] {pending.question}",
+                answer=answer,
+                source_type="sql_result",
+            )
+            db.add(log)
+            conversation.updated_at = datetime.utcnow()
+            db.commit()
+            db.refresh(log)
+            log_id = log.id
+
+    return SqlExecuteOut(**result, log_id=log_id)

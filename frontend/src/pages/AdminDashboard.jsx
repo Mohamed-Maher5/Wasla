@@ -12,6 +12,7 @@ import {
   uploadDocument,
 } from "../api";
 import DashboardHeader from "./DashboardHeader";
+import ChatPanel from "../components/ChatPanel";
 import "./AdminDashboard.css";
 
 const initialAgentForm = {
@@ -250,8 +251,19 @@ function AdminDashboard({ token, user, onLogout }) {
           >
             رفع ملف
           </button>
+
+          <button
+            className={
+              activeSection === "chat" ? "sa-tab active" : "sa-tab"
+            }
+            onClick={() => setActiveSection("chat")}
+          >
+            المساعد الذكي
+          </button>
+
         </nav>
 
+        {activeSection !== "chat" && (
         <div className="sa-create-box">
           {activeSection === "agents" && (
             <form className="management-form" onSubmit={handleAgentSubmit}>
@@ -373,7 +385,15 @@ function AdminDashboard({ token, user, onLogout }) {
             </form>
           )}
         </div>
+        )}
 
+        {activeSection === "chat" && (
+          <div className="sa-chat-box">
+            <ChatPanel token={token} user={user} fullWidth departmentId={user?.department_id} />
+          </div>
+        )}
+
+        {activeSection !== "chat" && (
         <div className="sa-main">
           {activeSection === "agents" && (
             <>
@@ -471,6 +491,7 @@ function AdminDashboard({ token, user, onLogout }) {
             </>
           )}
         </div>
+        )}
       </section>
     </div>
   );
