@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict
 
 class TriggerCallRequest(BaseModel):
     phone_number: str
+    ticket_id: str | None = None
 
 
 class CallAttemptOut(BaseModel):

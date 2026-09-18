@@ -1,6 +1,8 @@
 # This file contains the conversational guidance for Wasla's customer calls.
 # It keeps the support verification experience aligned with Egyptian Arabic customer conversations.
 
+import time
+
 import requests
 
 from app.shared.config import settings
@@ -19,6 +21,8 @@ off_topic, unclear, or not_resolved.
 EXPECTED_OUTCOMES = {"resolved", "off_topic", "unclear", "not_resolved"}
 GROQ_MODEL = "openai/gpt-oss-20b"
 GROQ_CHAT_COMPLETIONS_URL = "https://api.groq.com/openai/v1/chat/completions"
+MAX_RETRIES = 2
+RETRY_DELAY_SECONDS = 0.3
 
 
 def classify_response(transcript: str) -> str:
@@ -29,39 +33,48 @@ def classify_response(transcript: str) -> str:
         print("classify_response ERROR: LLM API key is not configured")
         return "unclear"
 
-    try:
-        response = requests.post(
-            GROQ_CHAT_COMPLETIONS_URL,
-            headers={
-                "Authorization": f"Bearer {settings.groq_llm_api_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": GROQ_MODEL,
-                "messages": [
-                    {"role": "system", "content": CLASSIFICATION_SYSTEM_PROMPT},
-                    {"role": "user", "content": transcript},
-                ],
-                "temperature": 0,
-                "max_completion_tokens": 128,
-                "reasoning_effort": "low",
-                "include_reasoning": False,
-            },
-            timeout=6,
-        )
-        response.raise_for_status()
-        raw_result = response.json()["choices"][0]["message"]["content"]
-        result = raw_result.strip().lower().strip("`'\".،,;:!؟? ")
-    except Exception as exc:
-        response_body = getattr(getattr(exc, "response", None), "text", "")
-        if response_body:
-            print(f"classify_response ERROR: {exc} response_body={response_body}")
-        else:
-            print(f"classify_response ERROR: {exc}")
-        return "unclear"
+    last_error = None
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            response = requests.post(
+                GROQ_CHAT_COMPLETIONS_URL,
+                headers={
+                    "Authorization": f"Bearer {settings.groq_llm_api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": GROQ_MODEL,
+                    "messages": [
+                        {"role": "system", "content": CLASSIFICATION_SYSTEM_PROMPT},
+                        {"role": "user", "content": transcript},
+                    ],
+                    "temperature": 0,
+                    "max_tokens": 128,
+                },
+                timeout=5,
+            )
+            response.raise_for_status()
+            raw_result = response.json()["choices"][0]["message"]["content"]
+            result = raw_result.strip().lower().strip("`'\".،,;:!؟? ")
 
-    if result not in EXPECTED_OUTCOMES:
-        print(f"classify_response ERROR: unexpected LLM response={result!r}")
-        return "unclear"
+            if result not in EXPECTED_OUTCOMES:
+                print(f"classify_response: unexpected LLM response={result!r}, retrying ({attempt}/{MAX_RETRIES})")
+                last_error = f"unexpected response: {result!r}"
+                if attempt < MAX_RETRIES:
+                    time.sleep(RETRY_DELAY_SECONDS)
+                    continue
+                return "unclear"
 
-    return result
+            return result
+
+        except Exception as exc:
+            response_body = getattr(getattr(exc, "response", None), "text", "")
+            error_msg = f"{exc}" + (f" response_body={response_body}" if response_body else "")
+            print(f"classify_response ERROR (attempt {attempt}/{MAX_RETRIES}): {error_msg}")
+            last_error = error_msg
+            if attempt < MAX_RETRIES:
+                time.sleep(RETRY_DELAY_SECONDS)
+                continue
+
+    print(f"classify_response: all {MAX_RETRIES} attempts failed, last error: {last_error}")
+    return "unclear"

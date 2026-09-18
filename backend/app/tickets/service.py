@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.models import User
 from app.departments.models import Department
-from app.shared.constants import UserRole
+from app.shared.constants import TicketStatus, UserRole
 from app.tickets.models import Ticket
 from app.tickets.schemas import TicketCreate
 

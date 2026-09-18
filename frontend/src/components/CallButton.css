@@ -15,19 +15,47 @@
     box-shadow: 0 2px 8px rgba(34, 139, 34, 0.35);
   }
   
-  .call-button:hover {
+  .call-button:hover:not(:disabled) {
     background: #1d7a1d;
   }
   
   .call-button:disabled {
-    opacity: 0.6;
+    opacity: 0.5;
     cursor: not-allowed;
   }
   
-  .call-result {
-    margin-top: 12px;
-    padding: 12px;
-    border-radius: 8px;
-    background: #f3f4f6;
-    line-height: 1.6;
+  .call-button.calling {
+    background: #e67e22;
+    box-shadow: 0 2px 8px rgba(230, 126, 34, 0.35);
+  }
+  
+.call-in-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.call-in-progress .call-button {
+  flex: 1;
+}
+
+.call-cancel-btn {
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: #e74c3c;
+  color: white;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(231, 76, 60, 0.35);
+}
+  
+  .call-cancel-btn:hover {
+    background: #c0392b;
   }

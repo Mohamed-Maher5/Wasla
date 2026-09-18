@@ -57,12 +57,22 @@ export async function callCustomer(ticketId, token) {
   return request("/telephony/trigger", {
     method: "POST",
     token,
-    body: JSON.stringify({ phone_number: ticket.client_phone_number }),
+    body: JSON.stringify({
+      phone_number: ticket.client_phone_number,
+      ticket_id: ticket.id,
+    }),
   });
 }
 
 export async function getCallStatus(callId, token) {
   return request(`/telephony/status/${callId}`, { token });
+}
+
+export async function cancelCall(callId, token) {
+  return request(`/telephony/cancel/${callId}`, {
+    method: "POST",
+    token,
+  });
 }
 
 export async function resolveTicket(ticketId, token) {

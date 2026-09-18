@@ -11,7 +11,9 @@ class CallAttempt(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     phone_number = Column(String, nullable=False)
+    ticket_id = Column(String, nullable=True)
     conversation_uuid = Column(String, nullable=True)
+    call_uuid = Column(String, nullable=True)
     transcript = Column(String, nullable=True)
     attempt_count = Column(Integer, nullable=False, default=0)
     outcome = Column(String, nullable=True)

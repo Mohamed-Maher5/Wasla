@@ -4,7 +4,7 @@ import io
 import requests
 import pypdf
 import docx as docx_lib
-import fitz  # PyMuPDF — renders PDF pages to images for OCR fallback
+import pymupdf  # renders PDF pages to images for OCR fallback
 import pytesseract
 from PIL import Image
 
@@ -88,11 +88,11 @@ def _extract_pdf_pages(file_bytes: bytes) -> List[tuple[Optional[int], str]]:
         # and running OCR on it, so scanned PDFs are readable too.
         if len(text.strip()) < MIN_TEXT_CHARS_BEFORE_OCR:
             if doc_for_ocr is None:
-                doc_for_ocr = fitz.open(stream=file_bytes, filetype="pdf")
+                doc_for_ocr = pymupdf.open(stream=file_bytes, filetype="pdf")
             try:
                 pdf_page = doc_for_ocr.load_page(i)
                 zoom = OCR_RENDER_DPI / 72  # PDF base unit is 72 DPI
-                pix = pdf_page.get_pixmap(matrix=fitz.Matrix(zoom, zoom))
+                pix = pdf_page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom))
                 image = Image.open(io.BytesIO(pix.tobytes("png")))
                 ocr_text = _ocr_image(image)
                 if ocr_text.strip():

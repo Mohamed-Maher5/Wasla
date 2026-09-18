@@ -1,32 +1,41 @@
-# This file exposes telephony endpoints for the Wasla backend.
-# It is the HTTP boundary for customer calls related to ticket resolution.
-
+import asyncio
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
+from app.auth.models import User
+from app.auth.service import get_current_user, require_role
 from app.shared.database import get_db
 from app.telephony.call_script import classify_response
 from app.telephony.models import CallAttempt
 from app.telephony.schemas import CallAttemptOut, TriggerCallRequest
-from app.telephony.service import gather_response, start_call
+from app.telephony.service import cancel_call, gather_response, start_call
 
 
 router = APIRouter(prefix="/telephony", tags=["telephony"])
 STATIC_DIR = Path(__file__).resolve().parent / "static"
-MAX_GATHER_ATTEMPTS = 10
+MAX_GATHER_ATTEMPTS = 3
 
 
 @router.post("/trigger", response_model=CallAttemptOut)
-def trigger_call(data: TriggerCallRequest, db: Session = Depends(get_db)) -> CallAttemptOut:
-    return start_call(data.phone_number, db)
+async def trigger_call(
+    data: TriggerCallRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("agent", "admin")),
+) -> CallAttemptOut:
+    return await start_call(data.phone_number, data.ticket_id, db)
 
 
 @router.get("/status/{call_id}", response_model=CallAttemptOut)
-def get_call_status(call_id: int, db: Session = Depends(get_db)) -> CallAttemptOut:
+def get_call_status(
+    call_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> CallAttemptOut:
     call_attempt = (
         db.query(CallAttempt).filter(CallAttempt.id == call_id).one_or_none()
     )
@@ -37,6 +46,15 @@ def get_call_status(call_id: int, db: Session = Depends(get_db)) -> CallAttemptO
         )
 
     return call_attempt
+
+
+@router.post("/cancel/{call_id}", response_model=CallAttemptOut)
+async def cancel_call_endpoint(
+    call_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> CallAttemptOut:
+    return await cancel_call(call_id, db)
 
 
 @router.api_route("/audio/{filename}", methods=["GET", "HEAD"])
@@ -52,59 +70,82 @@ def get_audio(filename: str) -> FileResponse:
 
 
 @router.post("/gather")
-def gather(payload: dict, db: Session = Depends(get_db)) -> list[dict[str, object]]:
-    print(f"/telephony/gather raw payload: {payload}")
+async def gather(request: Request, db: Session = Depends(get_db)) -> list[dict[str, object]]:
+    t0 = time.time()
 
+    def mark(label: str) -> None:
+        print(f"[gather] {label} +{((time.time() - t0) * 1000):.0f}ms")
+
+    # 1. The moment the webhook request is received
+    payload = await request.json()
+    mark("1-webhook-received")
+    print(f"[gather] payload keys: {list(payload.keys())}")
+
+    # 2. Right after the speech transcript is extracted from the payload
+    conversation_uuid = payload.get("conversation_uuid")
     speech = payload.get("speech") or {}
     results = speech.get("results") or []
-    text = results[0].get("text", "") if results else ""
-    conversation_uuid = payload.get("conversation_uuid")
-    outcome = classify_response(text)
-    should_retry = outcome in {"off_topic", "unclear"}
+    timeout_reason = speech.get("timeout_reason", "")
+    text = results[0].get("text", "").strip() if results else ""
+    mark("2-transcript-extracted")
+    print(f"[gather] uuid={conversation_uuid} text={text!r} timeout_reason={timeout_reason}")
 
     if not conversation_uuid:
-        print("/telephony/gather ERROR: payload did not include conversation_uuid")
-        should_retry = False
-        outcome = "unclear"
+        print(f"[gather] ERROR: no conversation_uuid")
+        return []
+
+    call_attempt = (
+        db.query(CallAttempt)
+        .filter(CallAttempt.conversation_uuid == conversation_uuid)
+        .one_or_none()
+    )
+    if call_attempt is None:
+        print(f"[gather] ERROR: no CallAttempt for uuid={conversation_uuid}")
+        return []
+
+    # SILENCE: customer said nothing — NEVER end the call, just ask again
+    if not text:
+        call_attempt.attempt_count += 1
+        call_attempt.outcome = None
+        db.commit()
+        print(f"[gather] silence — repeating question (attempt {call_attempt.attempt_count})")
+        ncco = gather_response("unclear", should_retry=True)
+        # 5. Right before the response NCCO is sent back to Vonage
+        mark("5-ncco-sent")
+        print(f"[gather] returning silence NCCO: {len(ncco)} actions")
+        return ncco
+
+    # 3. Right before the Groq classification API call starts
+    mark("3-classifying-start")
+    outcome = await asyncio.to_thread(classify_response, text)
+    # 4. Right after the Groq classification API call returns
+    mark("4-classifying-return")
+    print(f"[gather] classified: text={text!r} → outcome={outcome}")
+
+    if call_attempt.transcript:
+        call_attempt.transcript = f"{call_attempt.transcript}\n{text}"
     else:
-        call_attempt = (
-            db.query(CallAttempt)
-            .filter(CallAttempt.conversation_uuid == conversation_uuid)
-            .one_or_none()
+        call_attempt.transcript = text
+
+    call_attempt.attempt_count += 1
+    should_retry = outcome in {"off_topic", "unclear"} and call_attempt.attempt_count < MAX_GATHER_ATTEMPTS
+
+    if should_retry:
+        call_attempt.outcome = None
+    else:
+        call_attempt.outcome = (
+            outcome if outcome in {"resolved", "not_resolved"} else "unclear"
         )
-        if call_attempt is None:
-            print(
-                "/telephony/gather ERROR: no CallAttempt found for "
-                f"conversation_uuid={conversation_uuid}"
-            )
-            should_retry = False
-            outcome = "unclear"
-        else:
-            if call_attempt.transcript:
-                call_attempt.transcript = f"{call_attempt.transcript}\n{text}"
-            else:
-                call_attempt.transcript = text
+        call_attempt.ended_at = datetime.now(timezone.utc)
 
-            call_attempt.attempt_count += 1
-            if outcome in {"off_topic", "unclear"}:
-                should_retry = call_attempt.attempt_count < MAX_GATHER_ATTEMPTS
+    db.commit()
+    print(
+        f"[gather] updated: id={call_attempt.id} outcome={call_attempt.outcome} "
+        f"attempt={call_attempt.attempt_count} retry={should_retry}"
+    )
 
-            if should_retry:
-                call_attempt.outcome = None
-            else:
-                call_attempt.outcome = (
-                    outcome if outcome in {"resolved", "not_resolved"} else "unclear"
-                )
-                call_attempt.ended_at = datetime.now(timezone.utc)
-
-            db.commit()
-            db.refresh(call_attempt)
-            print(
-                "/telephony/gather updated CallAttempt "
-                f"id={call_attempt.id} conversation_uuid={conversation_uuid} "
-                f"outcome={call_attempt.outcome} "
-                f"attempt_count={call_attempt.attempt_count} "
-                f"should_retry={should_retry}"
-            )
-
-    return gather_response(outcome, should_retry)
+    ncco = gather_response(outcome, should_retry)
+    # 5. Right before the response NCCO is sent back to Vonage
+    mark("5-ncco-sent")
+    print(f"[gather] returning NCCO: {len(ncco)} actions")
+    return ncco

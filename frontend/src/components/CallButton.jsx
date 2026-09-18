@@ -1,32 +1,34 @@
-// This file renders the customer call action for the Wasla frontend.
-// It triggers the verification call and keeps the button locked until the
-// call finishes, then reports the new ticket state to the parent card.
-
 import { useEffect, useRef, useState } from "react";
-import { callCustomer, getCallStatus } from "../api";
+import { callCustomer, cancelCall, getCallStatus, getTicket } from "../api";
 import "./CallButton.css";
 
 const POLL_INTERVAL_MS = 3000;
 const MAX_WAIT_MS = 90000;
 
-function CallButton({ ticketId, token, onCallFinished }) {
+function CallButton({ ticketId, token, disabled, onCallFinished, initialCallCount = 0, onCallCountChange }) {
   const [calling, setCalling] = useState(false);
-  const [result, setResult] = useState("");
   const pollTimer = useRef(null);
   const timeoutTimer = useRef(null);
+  const callIdRef = useRef(null);
 
   useEffect(() => {
     return () => {
-      if (pollTimer.current) {
-        clearInterval(pollTimer.current);
-      }
-      if (timeoutTimer.current) {
-        clearTimeout(timeoutTimer.current);
-      }
+      if (pollTimer.current) clearInterval(pollTimer.current);
+      if (timeoutTimer.current) clearTimeout(timeoutTimer.current);
     };
   }, []);
 
+  async function refreshCallCount() {
+    try {
+      const ticket = await getTicket(ticketId, token);
+      onCallCountChange?.(ticket.call_count ?? 0);
+    } catch {
+      // keep whatever count we already have
+    }
+  }
+
   async function pollUntilFinished(callId) {
+    callIdRef.current = callId;
     pollTimer.current = setInterval(async () => {
       try {
         const attempt = await getCallStatus(callId, token);
@@ -36,54 +38,82 @@ function CallButton({ ticketId, token, onCallFinished }) {
           finishCall(attempt.outcome);
         }
       } catch {
-        // keep polling; the call may still be in progress
+        // keep polling
       }
     }, POLL_INTERVAL_MS);
 
     timeoutTimer.current = setTimeout(() => {
       clearInterval(pollTimer.current);
       setCalling(false);
-      setResult("لم يتم تأكيد انتهاء الاتصال");
+      refreshCallCount();
     }, MAX_WAIT_MS);
   }
 
   async function finishCall(outcome) {
+    if (outcome === "cancelled") {
+      setCalling(false);
+      refreshCallCount();
+      return;
+    }
     if (outcome === "resolved") {
-      setResult("انتهى الاتصال: تم حل المشكلة");
       onCallFinished?.("resolved");
     } else if (outcome === "not_resolved") {
-      setResult("انتهى الاتصال: لم يتم حل المشكلة");
       onCallFinished?.("unresolved");
-    } else {
-      setResult("انتهى الاتصال: غير واضح");
     }
     setCalling(false);
+    refreshCallCount();
+  }
+
+  async function handleCancel() {
+    if (pollTimer.current) clearInterval(pollTimer.current);
+    if (timeoutTimer.current) clearTimeout(timeoutTimer.current);
+    const callId = callIdRef.current;
+
+    if (callId) {
+      try {
+        await cancelCall(callId, token);
+      } catch {
+        // even if hangup fails, stop the UI polling
+      }
+    }
+
+    setCalling(false);
+    refreshCallCount();
   }
 
   async function handleCall() {
     setCalling(true);
-    setResult("");
 
     try {
       const response = await callCustomer(ticketId, token);
+      refreshCallCount();
       pollUntilFinished(response.id);
     } catch (error) {
       setCalling(false);
-      setResult(error.message);
+      refreshCallCount();
     }
   }
 
   return (
     <div className="call-section">
-      <button
-        className="call-button"
-        onClick={handleCall}
-        disabled={calling}
-      >
-        {calling ? "يتم بدأ التصال" : "الاتصال بالعميل"}
-      </button>
-
-      {result && <p className="call-result">{result}</p>}
+      {calling ? (
+        <div className="call-in-progress">
+          <button className="call-button calling" disabled>
+            جاري الاتصال بالعميل...
+          </button>
+          <button className="call-cancel-btn" onClick={handleCancel} title="إلغاء الاتصال">
+            ✕
+          </button>
+        </div>
+      ) : (
+        <button
+          className="call-button"
+          onClick={handleCall}
+          disabled={disabled}
+        >
+          الاتصال بالعميل
+        </button>
+      )}
     </div>
   );
 }

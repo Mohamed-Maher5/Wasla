@@ -31,5 +31,6 @@ class TicketOut(BaseModel):
     department_id: int
     created_by: int | None
     created_at: datetime
+    call_count: int = 0
 
     model_config = ConfigDict(from_attributes=True)

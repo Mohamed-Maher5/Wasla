@@ -4,6 +4,7 @@
 from datetime import datetime, timezone
 
 from sqlalchemy import Column, DateTime, ForeignKey, String
+from sqlalchemy.orm import object_session
 
 from app.shared.constants import TicketStatus
 from app.shared.database import Base
@@ -25,3 +26,19 @@ class Ticket(Base):
         nullable=False,
         default=lambda: datetime.now(timezone.utc),
     )
+
+    @property
+    def call_count(self) -> int:
+        from app.telephony.models import CallAttempt
+
+        session = object_session(self)
+        if session is None:
+            return 0
+        return (
+            session.query(CallAttempt)
+            .filter(
+                CallAttempt.ticket_id == self.id,
+                CallAttempt.outcome != "cancelled",
+            )
+            .count()
+        )
