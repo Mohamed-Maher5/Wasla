@@ -169,3 +169,8 @@ DELETE FROM departments;
 - **Department isolation is enforced server-side**: admins/agents always operate on their own department; client-sent department IDs are ignored except for superadmins.
 - Tables are created automatically on backend startup (`Base.metadata.create_all`).
 - The frontend pins port `3003` with `strictPort: true` — if the port is busy, Vite will fail instead of silently switching ports.
+
+
+## NL2SQL security configuration
+
+SQL answers are shown directly in chat, but the feature requires a dedicated read-only PostgreSQL role with per-department RLS. Follow [`docs/NL2SQL_DEPLOYMENT.md`](docs/NL2SQL_DEPLOYMENT.md) before enabling; it fails closed until configured.

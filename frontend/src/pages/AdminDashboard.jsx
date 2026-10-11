@@ -178,7 +178,7 @@ function AdminDashboard({ token, user, onLogout }) {
       setUploadFile(null);
       flashMessage("تم رفع الملف");
     } catch (err) {
-      flashMessage("", "فشل في رفع الملف");
+      flashMessage("", err.message || "فشل في رفع الملف");
     } finally {
       setUploading(false);
     }
@@ -264,16 +264,12 @@ function AdminDashboard({ token, user, onLogout }) {
             }
             onClick={() => setActiveSection("chat")}
           >
-            محادثه البوت
+            المساعد الذكي
           </button>
+
         </nav>
 
-        {activeSection === "chat" ? (
-          <div className="admin-chat-section">
-            <ChatPanel token={token} user={user} fullWidth />
-          </div>
-        ) : (
-          <>
+        {activeSection !== "chat" && (
         <div className="sa-create-box">
           {activeSection === "agents" && (
             <form className="management-form" onSubmit={handleAgentSubmit}>
@@ -384,12 +380,13 @@ function AdminDashboard({ token, user, onLogout }) {
                 <input
                   required
                   type="file"
-                  accept=".pdf,.docx"
+                  accept=".txt,.pdf,.docx,.png,.jpg,.jpeg,.bmp,.tiff,.tif,.webp"
                   onChange={(event) =>
                     setUploadFile(event.target.files?.[0] || null)
                   }
                 />
               </label>
+              <p className="upload-help">الأنواع المدعومة: TXT، PDF، DOCX، والصور.</p>
 
               <button type="submit" disabled={uploading || !uploadFile}>
                 {uploading ? "جاري الرفع..." : "رفع الملف"}
@@ -397,7 +394,15 @@ function AdminDashboard({ token, user, onLogout }) {
             </form>
           )}
         </div>
+        )}
 
+        {activeSection === "chat" && (
+          <div className="sa-chat-box">
+            <ChatPanel token={token} user={user} fullWidth departmentId={user?.department_id} />
+          </div>
+        )}
+
+        {activeSection !== "chat" && (
         <div className="sa-main">
           {activeSection === "agents" && (
             <>
@@ -495,7 +500,6 @@ function AdminDashboard({ token, user, onLogout }) {
             </>
           )}
         </div>
-          </>
         )}
       </section>
     </div>

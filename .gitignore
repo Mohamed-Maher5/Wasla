@@ -11,3 +11,4 @@ backend/app/documents/uploads/
 frontend/dist/
 .env.groq
 .venv/
+backend/private.key

@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import ChatPanel from "../components/ChatPanel";
 import TicketCard from "../components/TicketCard";
 import DashboardHeader from "./DashboardHeader";
-import { getDepartments, getTickets } from "../api";
+import { getDepartments, getTickets, uploadDocument } from "../api";
 import "./AgentDashboard.css";
 
 function AgentDashboard({ token, user, onLogout }) {
@@ -13,6 +13,8 @@ function AgentDashboard({ token, user, onLogout }) {
   const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [uploadMessage, setUploadMessage] = useState("");
 
   const department = useMemo(
     () => departments.find((d) => d.id === user?.department_id) || null,
@@ -44,6 +46,23 @@ function AgentDashboard({ token, user, onLogout }) {
         ticket.id === ticketId ? { ...ticket, status: newStatus } : ticket,
       ),
     );
+  }
+
+  async function handleDocumentUpload(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || uploading) return;
+
+    setUploading(true);
+    setUploadMessage("");
+    try {
+      await uploadDocument(file, token, user.department_id);
+      setUploadMessage("تم رفع الملف وإضافته إلى معرفة القسم.");
+    } catch (err) {
+      setUploadMessage(err.message || "فشل في رفع الملف.");
+    } finally {
+      setUploading(false);
+    }
   }
 
   return (
@@ -78,6 +97,19 @@ function AgentDashboard({ token, user, onLogout }) {
         </div>
 
         <div className="agent-chat-column">
+          <div className="agent-upload-box">
+            <label className="agent-upload-label">
+              {uploading ? "جاري رفع الملف..." : "رفع ملف معرفة للقسم"}
+              <input
+                type="file"
+                accept=".txt,.pdf,.docx,.png,.jpg,.jpeg,.bmp,.tiff,.tif,.webp"
+                onChange={handleDocumentUpload}
+                disabled={uploading}
+              />
+            </label>
+            <span>TXT، PDF، DOCX أو صورة</span>
+            {uploadMessage && <p>{uploadMessage}</p>}
+          </div>
           <ChatPanel token={token} user={user} fullWidth />
         </div>
       </div>

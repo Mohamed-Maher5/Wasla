@@ -8,6 +8,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
 
 class Settings(BaseSettings):
     DATABASE_URL: str
+    NL2SQL_READONLY_DATABASE_URL: str = ""
     JWT_SECRET: str
     TWILIO_SID: str = ""
     TWILIO_AUTH_TOKEN: str = ""
@@ -20,6 +21,7 @@ class Settings(BaseSettings):
     elevenlabs_api_key: str = ""
     elevenlabs_voice_id: str = ""
     huggingface_api_key: str = ""
+    tavily_api_key: str = ""  # web-search fallback for the RAG chatbot (https://tavily.com)
 
     model_config = SettingsConfigDict(env_file=BASE_DIR / ".env")
 

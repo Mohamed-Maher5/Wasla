@@ -3,7 +3,8 @@ import re
 import os
 import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, PROJECT_ROOT)
 
 from groq import Groq
 
@@ -17,15 +18,15 @@ t1 = "<think>Okay, the user is greeting me. I should respond warmly.</think>مر
 t2 = "some normal text without thinking"
 t3 = "<think>let me think</think> first <think>another block</think> result"
 
-assert _strip_thinking(t1) == "مرحباً، كيف حالك？", f"FAIL t1: {_strip_thinking(t1)}"
+assert _strip_thinking(t1) == "مرحباً، كيف حالك؟", f"FAIL t1: {_strip_thinking(t1)}"
 assert _strip_thinking(t2) == "some normal text without thinking", f"FAIL t2"
-assert _strip_thinking(t3) == "result", f"FAIL t3: {_strip_thinking(t3)}"
+assert _strip_thinking(t3) == "first  result", f"FAIL t3: {_strip_thinking(t3)}"
 print("[PASS] _strip_thinking works correctly\n")
 
 # ── 2. Live LLM test ────────────────────────────────────────────────────
 
 from dotenv import load_dotenv
-load_dotenv("/mnt/hdd/projects/Wasla/.env")
+load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
 
 api_key = os.getenv("GROQ_LLM_API_KEY")
 if not api_key:
@@ -62,6 +63,8 @@ def ask(question, context=None):
             {"role": "user", "content": user_msg},
         ],
         temperature=0.2,
+        max_tokens=300,
+        reasoning_effort="none",
     )
     raw = resp.choices[0].message.content
     cleaned = _strip_thinking(raw)

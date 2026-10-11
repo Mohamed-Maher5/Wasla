@@ -111,29 +111,18 @@
   min-width: 0;
 }
 
-/* ---------- bot chat section ---------- */
-
-.sa-workspace--chat {
-  grid-template-columns: 150px minmax(0, 1fr);
-  gap: 12px;
-}
-
-.admin-chat-section {
-  grid-column: 2;
+.sa-chat-box {
+  grid-column: 2 / -1;
   min-width: 0;
-  margin-left: -900px;
-  height: calc(100vh - 400px);
-  min-height: 520px;
+  height: 70vh;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  overflow: hidden;
 }
 
-.admin-chat-section .chat-panel--full {
-  flex: 1;
-  min-width: 0;
-  height: 100%;
-}
-
-.admin-chat-section .chat-panel-layout {
-  flex-direction: row-reverse;
+.sa-sql-box {
+  overflow-y: auto;
 }
 
 .sa-section-title {

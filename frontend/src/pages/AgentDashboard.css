@@ -82,6 +82,40 @@
   flex-direction: row-reverse;
 }
 
+/* ---------- agent document upload ---------- */
+
+.agent-upload-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  background: #eff6ff;
+  font-size: 13px;
+  direction: rtl;
+}
+
+.agent-upload-label {
+  padding: 7px 10px;
+  border-radius: 7px;
+  background: #2563eb;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.agent-upload-label input {
+  display: none;
+}
+
+.agent-upload-box > span,
+.agent-upload-box > p {
+  margin: 0;
+  color: #475569;
+}
+
 .agent-chat-column .chat-panel--full {
   flex: 1;
   min-height: 0;

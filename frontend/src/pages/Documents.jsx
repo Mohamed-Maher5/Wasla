@@ -96,7 +96,7 @@ function Documents({ token, user, onBack, initialDeptId }) {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".pdf,.docx,.png,.jpg,.jpeg,.bmp,.tiff,.tif,.webp"
+        accept=".txt,.pdf,.docx,.png,.jpg,.jpeg,.bmp,.tiff,.tif,.webp"
         style={{ display: "none" }}
         onChange={handleFileChange}
       />
@@ -204,16 +204,20 @@ function Documents({ token, user, onBack, initialDeptId }) {
             <h3>لا توجد مستندات حالياً</h3>
 
             <p>
-              اضغط على "رفع أول مستند" لإضافة ملف.
+              {isSuperadmin
+                ? "لا توجد مستندات في القسم المحدد."
+                : "اضغط على \"رفع أول مستند\" لإضافة ملف."}
             </p>
 
-            <button
-              className="upload-button secondary"
-              onClick={handleUploadClick}
-              disabled={uploading}
-            >
-              {uploading ? "جاري الرفع..." : "رفع أول مستند"}
-            </button>
+            {!isSuperadmin && (
+              <button
+                className="upload-button secondary"
+                onClick={handleUploadClick}
+                disabled={uploading}
+              >
+                {uploading ? "جاري الرفع..." : "رفع أول مستند"}
+              </button>
+            )}
           </div>
         )}
 

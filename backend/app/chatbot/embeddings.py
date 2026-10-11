@@ -57,7 +57,9 @@ def extract_pages(file_bytes: bytes, filename: str) -> List[tuple[Optional[int],
     """
     lower = filename.lower()
 
-    if lower.endswith(".pdf"):
+    if lower.endswith(".txt"):
+        return _extract_text_file_pages(file_bytes)
+    elif lower.endswith(".pdf"):
         return _extract_pdf_pages(file_bytes)
     elif lower.endswith(".docx"):
         return _extract_docx_pages(file_bytes)
@@ -65,9 +67,18 @@ def extract_pages(file_bytes: bytes, filename: str) -> List[tuple[Optional[int],
         return _extract_image_pages(file_bytes)
     else:
         raise ValueError(
-            f"Unsupported file type: {filename} — only PDF, DOCX, or image "
+            f"Unsupported file type: {filename} — only TXT, PDF, DOCX, or image "
             f"files (PNG/JPG/JPEG/BMP/TIFF/WEBP) are allowed"
         )
+
+
+def _extract_text_file_pages(file_bytes: bytes) -> List[tuple[Optional[int], str]]:
+    """Read a UTF-8 text file as one page-less knowledge-base document."""
+    try:
+        text = file_bytes.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise ValueError("Text files must be UTF-8 encoded") from exc
+    return [(None, text)]
 
 
 def _ocr_image(image: "Image.Image") -> str:
